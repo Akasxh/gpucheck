@@ -1,0 +1,119 @@
+"""Rich-formatted mismatch reports for tensor comparisons."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import numpy as np
+    import numpy.typing as npt
+
+
+def _safe_import_numpy() -> Any:
+    import numpy as np
+
+    return np
+
+
+def format_mismatch_report(
+    actual: npt.NDArray[Any],
+    expected: npt.NDArray[Any],
+    atol: float,
+    rtol: float,
+) -> str:
+    """Build a Rich-formatted mismatch report between two numpy arrays.
+
+    Returns a plain string containing Rich markup that can be printed with
+    ``rich.print()`` or ``rich.console.Console().print()``.
+    """
+    np = _safe_import_numpy()
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.text import Text
+
+    diff = np.abs(actual.astype(np.float64) - expected.astype(np.float64))
+    expected_f64 = np.abs(expected.astype(np.float64))
+
+    # Relative error: avoid division by zero.
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rel_err = np.where(expected_f64 != 0, diff / expected_f64, np.where(diff == 0, 0.0, np.inf))
+
+    # Mismatch mask: |a - b| > atol + rtol * |b|
+    threshold = atol + rtol * expected_f64
+    mismatch_mask = diff > threshold
+
+    total = actual.size
+    mismatch_count = int(np.sum(mismatch_mask))
+    mismatch_pct = 100.0 * mismatch_count / total if total > 0 else 0.0
+
+    max_abs_err = float(np.nanmax(diff)) if diff.size > 0 else 0.0
+    mean_abs_err = float(np.nanmean(diff)) if diff.size > 0 else 0.0
+    max_rel_err = float(np.nanmax(rel_err[np.isfinite(rel_err)])) if np.any(np.isfinite(rel_err)) else float("inf")
+
+    # Location of max absolute error.
+    max_idx = np.unravel_index(int(np.nanargmax(diff)), diff.shape) if diff.size > 0 else ()
+
+    # NaN / Inf stats.
+    nan_actual = int(np.sum(np.isnan(actual.astype(np.float64))))
+    nan_expected = int(np.sum(np.isnan(expected.astype(np.float64))))
+    inf_actual = int(np.sum(np.isinf(actual.astype(np.float64))))
+    inf_expected = int(np.sum(np.isinf(expected.astype(np.float64))))
+
+    # --- Build Rich output ---
+    stats_table = Table(title="Error Statistics", show_header=True, header_style="bold cyan")
+    stats_table.add_column("Metric", style="bold")
+    stats_table.add_column("Value", justify="right")
+    stats_table.add_row("Max absolute error", f"{max_abs_err:.6e}")
+    stats_table.add_row("Mean absolute error", f"{mean_abs_err:.6e}")
+    stats_table.add_row("Max relative error", f"{max_rel_err:.6e}")
+    stats_table.add_row("Mismatch count", f"{mismatch_count} / {total} ({mismatch_pct:.2f}%)")
+    stats_table.add_row("Location of max error", str(max_idx))
+    stats_table.add_row("Tolerances used", f"atol={atol:.2e}, rtol={rtol:.2e}")
+
+    if nan_actual or nan_expected or inf_actual or inf_expected:
+        stats_table.add_row("NaN (actual / expected)", f"{nan_actual} / {nan_expected}")
+        stats_table.add_row("Inf (actual / expected)", f"{inf_actual} / {inf_expected}")
+
+    # Histogram of absolute errors.
+    histogram = _error_histogram(diff, mismatch_mask)
+
+    console = Console(record=True, width=100)
+    console.print(Panel(stats_table, title="[bold red]Tensor Mismatch Report[/bold red]", border_style="red"))
+    if histogram:
+        console.print(Panel(Text(histogram), title="[bold yellow]Error Histogram[/bold yellow]", border_style="yellow"))
+
+    return console.export_text(styles=True)
+
+
+def _error_histogram(diff: npt.NDArray[Any], mismatch_mask: npt.NDArray[Any]) -> str:
+    """ASCII histogram of absolute error magnitudes (log-scale buckets)."""
+    np = _safe_import_numpy()
+
+    mismatched = diff[mismatch_mask]
+    if mismatched.size == 0:
+        return ""
+
+    # Log10 buckets.
+    with np.errstate(divide="ignore"):
+        log_vals = np.log10(np.maximum(mismatched, 1e-20))
+
+    lo = int(np.floor(np.min(log_vals)))
+    hi = int(np.ceil(np.max(log_vals)))
+    if lo == hi:
+        hi = lo + 1
+
+    bins = list(range(lo, hi + 1))
+    counts, _ = np.histogram(log_vals, bins=bins)
+
+    max_count = int(np.max(counts)) if counts.size > 0 else 1
+    bar_width = 40
+
+    lines: list[str] = []
+    for i, count in enumerate(counts):
+        bucket = f"[1e{bins[i]:+d}, 1e{bins[i + 1]:+d})"
+        bar_len = int(count / max_count * bar_width) if max_count > 0 else 0
+        bar = "\u2588" * bar_len
+        lines.append(f"  {bucket:>22s} | {bar} {count}")
+
+    return "\n".join(lines)
