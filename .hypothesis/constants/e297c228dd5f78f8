@@ -1,0 +1,4 @@
+# file: /home/akash/PROJECTS/github-projects-all/gpucheck-repo/src/gpucheck/decorators/parametrize.py
+# hypothesis_version: 6.151.9
+
+[128, '-', ':', 'cuda:0', 'dtype,shape,device', 'float16', 'float32', 'parametrize_gpu']

@@ -1,0 +1,4 @@
+# file: /home/akash/PROJECTS/github-projects-all/gpucheck-repo/src/gpucheck/decorators/shapes.py
+# hypothesis_version: 6.151.9
+
+[127, 128, 256, 512, 1024, 2048, 4096, 8192, 'EDGE_SHAPES', 'LARGE_SHAPES', 'MEDIUM_SHAPES', 'SMALL_SHAPES', 'shape', 'shapes', 'x']

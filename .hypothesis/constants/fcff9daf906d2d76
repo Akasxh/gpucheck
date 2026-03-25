@@ -1,0 +1,4 @@
+# file: /home/akash/PROJECTS/github-projects-all/gpucheck-repo/src/gpucheck/fuzzing/shapes.py
+# hypothesis_version: 6.151.9
+
+[127, 128, 129, 255, 256, 257, 511, 512, 513, 1024, 2048, 4096, 8192, 'LARGE_DIMS', 'PRIMES', 'ShapeStrategy', 'TILE_SIZES', 'fuzz_shapes']

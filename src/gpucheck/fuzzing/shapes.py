@@ -165,10 +165,13 @@ def fuzz_shapes(
 
 
 class ShapeStrategy:
-    """Hypothesis-compatible strategy wrapper for GPU tensor shapes.
+    """Hypothesis-compatible strategy factory for GPU tensor shapes.
 
     Requires ``hypothesis`` to be installed.  Lazily imports it so the rest
     of the module works without the dependency.
+
+    Returns a proper ``SearchStrategy`` instance so ``@given(shape=ShapeStrategy(...))``
+    works directly.
 
     Usage::
 
@@ -179,19 +182,17 @@ class ShapeStrategy:
         def test_kernel(shape): ...
     """
 
-    def __init__(
-        self,
+    def __new__(
+        cls,
         ndim: int = 2,
         *,
         min_size: int = 1,
         max_size: int = 4096,
-    ) -> None:
-        self.ndim = ndim
-        self.min_size = min_size
-        self.max_size = max_size
-        self._strategy: Any | None = None
+    ) -> Any:
+        return cls._build(ndim, min_size, max_size)
 
-    def _build(self) -> Any:
+    @staticmethod
+    def _build(ndim: int, min_size: int, max_size: int) -> Any:
         try:
             from hypothesis import strategies as st
         except ImportError as exc:
@@ -207,38 +208,13 @@ class ShapeStrategy:
                 *POWER_OF_2_BOUNDARIES,
                 *[t - 1 for t in TILE_SIZES],
                 *[t + 1 for t in TILE_SIZES],
-            ) if v <= self.max_size}
+            ) if v <= max_size}
         )
         dim_strategy = st.one_of(
             st.sampled_from(interesting),
-            st.integers(min_value=self.min_size, max_value=self.max_size),
+            st.integers(min_value=min_size, max_value=max_size),
         )
-        return st.tuples(*([dim_strategy] * self.ndim))
-
-    # ------------------------------------------------------------------
-    # Hypothesis SearchStrategy duck-typing
-    # ------------------------------------------------------------------
-
-    def example(self) -> tuple[int, ...]:
-        """Draw a single example (for quick testing outside Hypothesis)."""
-        if self._strategy is None:
-            self._strategy = self._build()
-        return self._strategy.example()  # type: ignore[no-any-return]
-
-    def __repr__(self) -> str:
-        return (
-            f"ShapeStrategy(ndim={self.ndim}, "
-            f"min_size={self.min_size}, max_size={self.max_size})"
-        )
-
-    # Allow `@given(shape=ShapeStrategy(...))` — Hypothesis calls
-    # `SearchStrategy.do_draw`, but delegating to an inner strategy
-    # via `flatmap` is the idiomatic wrapper approach.
-    def __getattr__(self, name: str) -> Any:
-        """Proxy attribute access to the inner Hypothesis strategy."""
-        if self._strategy is None:
-            self._strategy = self._build()
-        return getattr(self._strategy, name)
+        return st.tuples(*([dim_strategy] * ndim))
 
 
 __all__ = [

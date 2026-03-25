@@ -64,6 +64,7 @@ class RooflinePoint:
     # Keep raw values for downstream use
     achieved_flops: float = 0.0  # FLOP/s
     achieved_bandwidth: float = 0.0  # bytes/s
+    peak_bandwidth: float = 0.0  # bytes/s — needed for bandwidth utilization
 
     @property
     def compute_utilization(self) -> float:
@@ -72,7 +73,9 @@ class RooflinePoint:
     @property
     def bandwidth_utilization(self) -> float:
         """Fraction of peak bandwidth consumed (only meaningful if memory-bound)."""
-        return self.achieved_bandwidth / 1.0 if self.achieved_bandwidth > 0 else 0.0
+        if self.peak_bandwidth > 0 and self.achieved_bandwidth > 0:
+            return self.achieved_bandwidth / self.peak_bandwidth
+        return 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -104,11 +107,11 @@ def compute_roofline(
         raise ValueError("benchmark_results must be non-empty")
     if flops < 0:
         raise ValueError("flops must be >= 0")
-    if bytes_accessed <= 0:
-        raise ValueError("bytes_accessed must be > 0")
+    if bytes_accessed < 0:
+        raise ValueError("bytes_accessed must be >= 0")
 
     median_s = _median(list(benchmark_results))
-    ai = flops / bytes_accessed  # FLOP/byte
+    ai = flops / bytes_accessed if bytes_accessed > 0 else float("inf")
 
     achieved_flops = flops / median_s if median_s > 0 else 0.0
     achieved_bw = bytes_accessed / median_s if median_s > 0 else 0.0
@@ -131,6 +134,7 @@ def compute_roofline(
         efficiency_pct=efficiency,
         achieved_flops=achieved_flops,
         achieved_bandwidth=achieved_bw,
+        peak_bandwidth=gpu_specs.peak_bandwidth if gpu_specs is not None else 0.0,
     )
 
 

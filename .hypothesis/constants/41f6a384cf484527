@@ -1,0 +1,4 @@
+# file: /home/akash/PROJECTS/github-projects-all/gpucheck-repo/src/gpucheck/fixtures/gpu.py
+# hypothesis_version: 6.151.9
+
+[1024, 'No GPU available', 'utf-8']

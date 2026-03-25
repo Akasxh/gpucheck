@@ -129,22 +129,22 @@ class TestShapeStrategyShrinks:
         assert len(example) == 2
         assert all(isinstance(d, int) for d in example)
 
-    def test_strategy_repr(self) -> None:
+    def test_strategy_is_search_strategy(self) -> None:
+        hypothesis = pytest.importorskip("hypothesis")
+        from hypothesis.strategies import SearchStrategy
+
         strat = ShapeStrategy(ndim=3, min_size=1, max_size=512)
-        r = repr(strat)
-        assert "ndim=3" in r
-        assert "max_size=512" in r
+        assert isinstance(strat, SearchStrategy)
 
     def test_strategy_with_hypothesis_given(self) -> None:
         hypothesis = pytest.importorskip("hypothesis")
         from hypothesis import given, settings
 
+        # ShapeStrategy now returns a SearchStrategy directly
         strat = ShapeStrategy(ndim=2, min_size=1, max_size=64)
-        # Use the inner hypothesis strategy directly for @given
-        inner = strat._build()
 
         @settings(max_examples=10, deadline=None)
-        @given(shape=inner)
+        @given(shape=strat)
         def _check(shape: tuple[int, ...]) -> None:
             assert len(shape) == 2
             assert all(isinstance(d, int) for d in shape)

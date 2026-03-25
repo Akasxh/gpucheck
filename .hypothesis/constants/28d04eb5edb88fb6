@@ -1,0 +1,4 @@
+# file: /home/akash/PROJECTS/github-projects-all/gpucheck-repo/src/gpucheck/fixtures/benchmark.py
+# hypothesis_version: 6.151.9
+
+[0.0, 1.5, 5.0, 25.0, 50.0, 75.0, 95.0, 100.0, 100, 1024, 'cuda']

@@ -1,0 +1,4 @@
+# file: /home/akash/PROJECTS/github-projects-all/gpucheck-repo/src/gpucheck/analysis/bottleneck.py
+# hypothesis_version: 6.151.9
+
+[0.0, 1e-15, 0.2, 0.6, 0.85, 'balanced', 'compute_bound', 'memory_bound']

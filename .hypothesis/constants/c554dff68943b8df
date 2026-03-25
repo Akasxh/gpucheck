@@ -1,0 +1,4 @@
+# file: /home/akash/PROJECTS/github-projects-all/gpucheck-repo/src/gpucheck/assertions/tolerances.py
+# hypothesis_version: 6.151.9
+
+[1e-10, 1e-07, 1.3e-06, 1e-05, 0.0001, 0.001, 0.016, 0.125, 0.25, 'atol', 'bfloat16', 'float16', 'float32', 'float64', 'float8_e4m3fn', 'float8_e5m2', 'gpucheck', 'rtol', 'tf32', 'tolerances', 'tool', 'torch.']

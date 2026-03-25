@@ -196,7 +196,7 @@ def _detect_via_torch() -> list[GPUInfo] | None:
         props = torch.cuda.get_device_properties(i)
         cc = (props.major, props.minor)
 
-        total_mb = props.total_mem // (1024 * 1024)
+        total_mb = getattr(props, "total_memory", getattr(props, "total_mem", 0)) // (1024 * 1024)
         # torch doesn't expose free memory without allocating context; approximate
         try:
             torch.cuda.set_device(i)
