@@ -94,9 +94,14 @@ def _error_histogram(diff: npt.NDArray[Any], mismatch_mask: npt.NDArray[Any]) ->
     if mismatched.size == 0:
         return ""
 
+    # Filter out non-finite values before computing log-scale histogram.
+    finite_mismatched = mismatched[np.isfinite(mismatched)]
+    if finite_mismatched.size == 0:
+        return f"  All {mismatched.size} mismatched values are non-finite (NaN/Inf)"
+
     # Log10 buckets.
     with np.errstate(divide="ignore"):
-        log_vals = np.log10(np.maximum(mismatched, 1e-20))
+        log_vals = np.log10(np.maximum(finite_mismatched, 1e-20))
 
     lo = int(np.floor(np.min(log_vals)))
     hi = int(np.ceil(np.max(log_vals)))

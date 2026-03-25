@@ -17,7 +17,7 @@ from gpucheck.assertions.tolerances import (
     tolerance_context,
 )
 
-from conftest import make_close_tensors, make_divergent_tensors, make_exact_tensors
+from tests.conftest import make_close_tensors, make_divergent_tensors, make_exact_tensors
 
 
 # ---------------------------------------------------------------------------

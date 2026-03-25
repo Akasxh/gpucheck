@@ -140,9 +140,11 @@ class TestShapeStrategyShrinks:
         from hypothesis import given, settings
 
         strat = ShapeStrategy(ndim=2, min_size=1, max_size=64)
+        # Use the inner hypothesis strategy directly for @given
+        inner = strat._build()
 
         @settings(max_examples=10, deadline=None)
-        @given(shape=strat)
+        @given(shape=inner)
         def _check(shape: tuple[int, ...]) -> None:
             assert len(shape) == 2
             assert all(isinstance(d, int) for d in shape)

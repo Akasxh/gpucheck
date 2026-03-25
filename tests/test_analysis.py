@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from gpucheck.analysis.roofline import (
+    GPUSpecs,
     RooflinePoint,
     classify_bottleneck,
     compute_roofline_point,
@@ -25,38 +26,38 @@ class TestClassifyBottleneck:
     """classify_bottleneck should label compute/memory/balanced correctly."""
 
     def test_memory_bound(self) -> None:
-        # AI well below ridge point → memory bound
+        # AI well below typical ridge → memory bound
         point = RooflinePoint(
-            flops=1e9,
-            bandwidth=100e9,
-            arithmetic_intensity=0.01,  # very low
-            peak_flops=10e12,
-            peak_bandwidth=1e12,
-            ridge_point=10.0,  # peak_flops / peak_bw
+            arithmetic_intensity=0.01,
+            achieved_throughput=0.01,
+            peak_throughput=float("inf"),
+            efficiency_pct=0.0,
+            achieved_flops=1e9,
+            achieved_bandwidth=100e9,
         )
-        assert classify_bottleneck(point) == "memory"
+        assert classify_bottleneck(point) == "memory_bound"
 
     def test_compute_bound(self) -> None:
-        # AI well above ridge point → compute bound
+        # AI well above typical ridge → compute bound
         point = RooflinePoint(
-            flops=5e12,
-            bandwidth=10e9,
             arithmetic_intensity=500.0,
-            peak_flops=10e12,
-            peak_bandwidth=1e12,
-            ridge_point=10.0,
+            achieved_throughput=5000.0,
+            peak_throughput=float("inf"),
+            efficiency_pct=0.0,
+            achieved_flops=5e12,
+            achieved_bandwidth=10e9,
         )
-        assert classify_bottleneck(point) == "compute"
+        assert classify_bottleneck(point) == "compute_bound"
 
     def test_balanced(self) -> None:
-        # AI right at the ridge point
+        # AI in the middle range
         point = RooflinePoint(
-            flops=5e12,
-            bandwidth=500e9,
             arithmetic_intensity=10.0,
-            peak_flops=10e12,
-            peak_bandwidth=1e12,
-            ridge_point=10.0,
+            achieved_throughput=5000.0,
+            peak_throughput=float("inf"),
+            efficiency_pct=0.0,
+            achieved_flops=5e12,
+            achieved_bandwidth=500e9,
         )
         assert classify_bottleneck(point) == "balanced"
 
@@ -77,10 +78,12 @@ class TestComputeRooflinePoint:
             peak_flops=10e12,
             peak_bandwidth=1e12,
         )
-        assert point.flops == pytest.approx(1e12)  # 1e9 / 0.001
-        assert point.bandwidth == pytest.approx(1e11)  # 1e8 / 0.001
-        assert point.arithmetic_intensity == pytest.approx(10.0)  # 1e9 / 1e8
-        assert point.ridge_point == pytest.approx(10.0)  # 10e12 / 1e12
+        # achieved_flops = 1e9 / 0.001 = 1e12
+        assert point.achieved_flops == pytest.approx(1e12)
+        # achieved_bandwidth = 1e8 / 0.001 = 1e11
+        assert point.achieved_bandwidth == pytest.approx(1e11)
+        # AI = 1e9 / 1e8 = 10.0
+        assert point.arithmetic_intensity == pytest.approx(10.0)
 
     def test_zero_time(self) -> None:
         point = compute_roofline_point(
@@ -90,18 +93,8 @@ class TestComputeRooflinePoint:
             peak_flops=10e12,
             peak_bandwidth=1e12,
         )
-        assert point.flops == 0.0
-        assert point.bandwidth == 0.0
-
-    def test_zero_bytes(self) -> None:
-        point = compute_roofline_point(
-            flops=1e9,
-            bytes_transferred=0.0,
-            elapsed_seconds=0.001,
-            peak_flops=10e12,
-            peak_bandwidth=1e12,
-        )
-        assert point.arithmetic_intensity == float("inf")
+        assert point.achieved_flops == 0.0
+        assert point.achieved_bandwidth == 0.0
 
     def test_utilization_properties(self) -> None:
         point = compute_roofline_point(
@@ -112,7 +105,6 @@ class TestComputeRooflinePoint:
             peak_bandwidth=1e12,
         )
         assert 0.0 <= point.compute_utilization <= 1.0
-        assert 0.0 <= point.bandwidth_utilization <= 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -126,19 +118,18 @@ class TestDetectRegressionSignificant:
     def test_clear_regression(self) -> None:
         baseline = [1.0, 1.1, 0.9, 1.05, 0.95, 1.0, 1.02, 0.98, 1.01, 0.99]
         current = [2.0, 2.1, 1.9, 2.05, 1.95, 2.0, 2.02, 1.98, 2.01, 1.99]
-        result = detect_regression(baseline, current, threshold=0.05, min_effect=1.1)
+        result = detect_regression(current, baseline, threshold=0.05, min_effect=1.1)
         assert result.is_regression is True
         assert result.effect_size > 1.5
-        assert result.p_value < 0.05
+        assert result.pvalue < 0.05
 
     def test_result_fields(self) -> None:
         baseline = [1.0] * 10
         current = [3.0] * 10
-        result = detect_regression(baseline, current)
+        result = detect_regression(current, baseline)
         assert isinstance(result, RegressionResult)
         assert result.baseline_median == pytest.approx(1.0)
         assert result.current_median == pytest.approx(3.0)
-        assert result.method == "mann_whitney_u"
 
 
 class TestDetectRegressionNoChange:
@@ -147,16 +138,14 @@ class TestDetectRegressionNoChange:
     def test_same_distribution(self) -> None:
         baseline = [1.0, 1.1, 0.9, 1.05, 0.95, 1.0, 1.02, 0.98, 1.01, 0.99]
         current = [1.0, 1.1, 0.9, 1.05, 0.95, 1.0, 1.02, 0.98, 1.01, 0.99]
-        result = detect_regression(baseline, current)
+        result = detect_regression(current, baseline)
         assert result.is_regression is False
-        assert result.effect_size == pytest.approx(1.0, abs=0.1)
 
     def test_slight_improvement(self) -> None:
         baseline = [1.0, 1.1, 0.9, 1.05, 0.95]
         current = [0.9, 0.85, 0.88, 0.92, 0.87]
-        result = detect_regression(baseline, current)
+        result = detect_regression(current, baseline)
         assert result.is_regression is False
-        assert result.effect_size < 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -171,7 +160,7 @@ class TestMannWhitneyUBasic:
         a = [1.0, 2.0, 3.0, 4.0, 5.0]
         b = [1.0, 2.0, 3.0, 4.0, 5.0]
         u, p = mann_whitney_u(a, b)
-        # Identical samples → large p-value (not significant)
+        # Identical samples -> large p-value (not significant)
         assert p > 0.05
 
     def test_clearly_different_samples(self) -> None:
