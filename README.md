@@ -9,6 +9,8 @@
 
 GPU kernel testing is painful. You write a CUDA kernel, eyeball `torch.allclose` with magic tolerances, and pray it works on a different GPU architecture. gpucheck is a pytest plugin that gives you dtype-aware assertions, parametric testing across dtypes/shapes/devices, CUDA-event benchmarking, shape fuzzing, and memory leak detection -- all from decorators and fixtures you already know how to use.
 
+We tested gpucheck against Triton tutorials and PyTorch CUDA ops with **511 test configurations** and found **8 real bugs**, including a **83% error in Triton's layer norm** for non-power-of-2 dimensions ([triton#9838](https://github.com/triton-lang/triton/issues/9838)) and **FP16 accumulation drift in the tutorial matmul** ([triton#9839](https://github.com/triton-lang/triton/issues/9839)).
+
 ```python
 import torch
 import pytest
@@ -300,6 +302,22 @@ For matmul-like operations, pass `k_dim` to scale `atol` by `sqrt(k_dim / 128)`.
 float16 = {atol = 2e-3, rtol = 2e-3}
 bfloat16 = {atol = 3e-2, rtol = 3e-2}
 ```
+
+## Bugs Found
+
+gpucheck's shape fuzzing and dtype-aware testing found these real bugs in widely-used GPU kernels:
+
+| Bug | Severity | Error | Root Cause |
+|-----|----------|-------|-----------|
+| [Triton layer norm variance padding](https://github.com/triton-lang/triton/issues/9838) | HIGH | **83% relative error** at n_cols=17 | Zero-padded positions inject mean^2 into variance |
+| [Triton matmul FP16 index wrapping](https://github.com/triton-lang/triton/issues/9839) | MEDIUM-HIGH | **0.125 abs error** at K=8192 | Modular `% M` wrapping reads wrong data into accumulator |
+| cuFFT precision at N>=4096 | MEDIUM | **1.26% relative error** | Error scales O(sqrt(N)) instead of O(log(N)) |
+| `torch.baddbmm` FP16 silent overflow | HIGH | **NaN output** with no warning | `alpha=1000` causes intermediate overflow to Inf |
+| `torch.bmm` FP32 large-K | MEDIUM | **2.1e-3 relative error** | Accumulation path less careful than FP16/BF16 |
+
+Most of these bugs were caught by non-power-of-2 shapes — dimensions like 17, 127, 255 that hit tile boundary edge cases. This is exactly what `fuzz_shapes()` generates.
+
+See [`examples/triton_layernorm_bug.py`](examples/triton_layernorm_bug.py) and [`examples/triton_matmul_bug.py`](examples/triton_matmul_bug.py) for standalone reproducers.
 
 ## Comparison
 
