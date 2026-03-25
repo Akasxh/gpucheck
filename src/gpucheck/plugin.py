@@ -130,7 +130,7 @@ def memory_tracker() -> Any:
     yield tracker
     if tracker.report is None:
         report = tracker.stop()
-        if report.leak_detected:
+        if report.has_leak:
             warnings.warn(
                 f"GPU memory leak detected: {report.leaked_mb:.1f}MB not freed",
                 RuntimeWarning,

@@ -34,8 +34,8 @@ def _torch_mod() -> Any:
 def _is_floating(dtype: Any) -> bool:
     torch = _torch_mod()
     if hasattr(dtype, "is_floating_point"):
-        return dtype.is_floating_point
-    return torch.is_floating_point(torch.empty(0, dtype=dtype))
+        return bool(dtype.is_floating_point)
+    return bool(torch.is_floating_point(torch.empty(0, dtype=dtype)))
 
 
 def _dtype_info(dtype: Any) -> tuple[float, float, float]:

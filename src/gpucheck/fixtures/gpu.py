@@ -43,7 +43,7 @@ class GPUDevice:
 def _detect_gpu_pynvml() -> GPUDevice | None:
     """Detect GPU using pynvml (no torch dependency)."""
     try:
-        import pynvml  # type: ignore[import-untyped]
+        import pynvml
     except ImportError:
         return None
 
@@ -90,7 +90,7 @@ def _detect_gpu_pynvml() -> GPUDevice | None:
 def _detect_gpu_torch() -> GPUDevice | None:
     """Detect GPU using torch.cuda."""
     try:
-        import torch  # type: ignore[import-untyped]
+        import torch
     except ImportError:
         return None
 
@@ -125,7 +125,7 @@ def _cleanup_gpu() -> None:
     """Best-effort GPU memory cleanup."""
     gc.collect()
     try:
-        import torch  # type: ignore[import-untyped]
+        import torch
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()

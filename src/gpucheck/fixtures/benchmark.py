@@ -70,15 +70,15 @@ def _remove_outliers_iqr(times: list[float], factor: float = 1.5) -> list[float]
 def _get_l2_cache_size() -> int:
     """Auto-detect L2 cache size in bytes via pynvml. Falls back to 40MB."""
     try:
-        import pynvml  # type: ignore[import-untyped]
+        import pynvml
 
         pynvml.nvmlInit()
         try:
             handle = pynvml.nvmlDeviceGetHandleByIndex(0)
             # nvmlDeviceGetAttribute is not universally available; fall back
             try:
-                attr = pynvml.NVML_DEVICE_ATTRIBUTE_GPU_L2_CACHE_SIZE  # type: ignore[attr-defined]
-                l2 = pynvml.nvmlDeviceGetAttribute(handle, attr)  # type: ignore[attr-defined]
+                attr = pynvml.NVML_DEVICE_ATTRIBUTE_GPU_L2_CACHE_SIZE
+                l2 = pynvml.nvmlDeviceGetAttribute(handle, attr)
                 return int(l2) * 1024  # returned in KB
             except (AttributeError, pynvml.NVMLError):
                 pass
@@ -96,7 +96,7 @@ def _get_torch() -> Any:
     """Lazy-cached torch import for hot-loop use."""
     global _torch_cache  # noqa: PLW0603
     if _torch_cache is None:
-        import torch  # type: ignore[import-untyped]
+        import torch
 
         _torch_cache = torch
     return _torch_cache
@@ -171,7 +171,7 @@ class _BenchmarkRunner:
             Keyword arguments forwarded to *fn*.
         """
         try:
-            import torch  # type: ignore[import-untyped]
+            import torch
         except ImportError as exc:
             raise RuntimeError(
                 "gpu_benchmark requires PyTorch for CUDA event timing. "
@@ -191,8 +191,8 @@ class _BenchmarkRunner:
         torch.cuda.synchronize()
 
         # Pre-allocate CUDA events to avoid per-iteration allocation overhead
-        start = torch.cuda.Event(enable_timing=True)
-        end = torch.cuda.Event(enable_timing=True)
+        start = torch.cuda.Event(enable_timing=True)  # type: ignore[no-untyped-call]
+        end = torch.cuda.Event(enable_timing=True)  # type: ignore[no-untyped-call]
 
         # Timed runs
         raw_times: list[float] = []
@@ -200,12 +200,12 @@ class _BenchmarkRunner:
             if do_flush and self._l2_size > 0:
                 _flush_l2_cache(self._l2_size, buf=self._flush_buf)
 
-            start.record()  # type: ignore[no-untyped-call]
+            start.record()
             fn(*args, **kwargs)
-            end.record()  # type: ignore[no-untyped-call]
+            end.record()
 
             torch.cuda.synchronize()
-            elapsed_ms: float = start.elapsed_time(end)  # type: ignore[no-untyped-call]
+            elapsed_ms: float = start.elapsed_time(end)
             raw_times.append(elapsed_ms)
 
         # Outlier removal

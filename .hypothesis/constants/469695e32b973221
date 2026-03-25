@@ -1,4 +1,0 @@
-# file: /home/akash/PROJECTS/github-projects-all/gpucheck-repo/src/gpucheck/fuzzing/inputs.py
-# hypothesis_version: 6.151.9
-
-[-1.0, 0.0, 0.1, 0.5, 0.99, 1.0, '-inf', 'cpu', 'custom', 'denormal', 'edge_inputs', 'float8_e4m3fn', 'float8_e4m3fnuz', 'float8_e5m2', 'float8_e5m2fnuz', 'inf', 'int_max', 'int_min', 'is_floating_point', 'max_val', 'min_val', 'mixed_inputs', 'mixed_normal_edge', 'nan', 'near_neg_overflow', 'near_overflow', 'neg_denormal', 'neg_ones', 'normal', 'ones', 'random_inputs', 'sprinkled_inf', 'sprinkled_nan', 'sprinkled_neg_inf', 'uniform', 'zeros']

@@ -1,4 +1,0 @@
-# file: /home/akash/PROJECTS/github-projects-all/gpucheck-repo/src/gpucheck/analysis/roofline.py
-# hypothesis_version: 6.151.9
-
-[0.0, 1e-12, 1e-06, 0.1, 1.0, 2.0, 4.0, 10.0, 16.0, 20.0, 100.0, 1000000000.0, 900000000000.0, 936000000000.0, 1008000000000.0, 2039000000000.0, 3350000000000.0, 15700000000000.0, 19500000000000.0, 35600000000000.0, 51200000000000.0, 82600000000000.0, '-', '/', 'A100', 'H100', 'RTX 3090', 'RTX 4090', 'V100', 'balanced', 'compute_bound', 'flops must be >= 0', 'inf', 'memory_bound']

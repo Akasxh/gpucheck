@@ -111,7 +111,7 @@ class GPUInfo:
 def _detect_via_pynvml() -> list[GPUInfo] | None:
     """Try GPU detection via pynvml. Returns None if unavailable."""
     try:
-        import pynvml  # type: ignore[import-untyped]
+        import pynvml
     except ImportError:
         return None
 

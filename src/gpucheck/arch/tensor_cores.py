@@ -191,13 +191,13 @@ def warn_tensor_core_fallback() -> None:
     try:
         import torch
 
-        if hasattr(torch.backends, "cuda") and not torch.backends.cuda.matmul.allow_tf32:  # type: ignore[attr-defined]
+        if hasattr(torch.backends, "cuda") and not torch.backends.cuda.matmul.allow_tf32:
             issues.append(
                 "torch.backends.cuda.matmul.allow_tf32 is False — "
                 "matmul will use FP32 CUDA cores instead of TF32 tensor cores."
             )
 
-        if hasattr(torch.backends, "cudnn") and not torch.backends.cudnn.allow_tf32:  # type: ignore[attr-defined]
+        if hasattr(torch.backends, "cudnn") and not torch.backends.cudnn.allow_tf32:
             issues.append(
                 "torch.backends.cudnn.allow_tf32 is False — "
                 "cuDNN convolutions will use FP32 CUDA cores instead of TF32 tensor cores."

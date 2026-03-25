@@ -1,4 +1,0 @@
-# file: /home/akash/PROJECTS/github-projects-all/gpucheck-repo/src/gpucheck/arch/detection.py
-# hypothesis_version: 6.151.9
-
-[164, 228, 1000, 1024, 'Ada', 'Ampere', 'Blackwell', 'Hopper', 'Pascal', 'Turing', 'Unknown', 'Volta', 'cuda', 'total_mem', 'total_memory']

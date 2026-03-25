@@ -1,4 +1,0 @@
-# file: /home/akash/PROJECTS/github-projects-all/gpucheck-repo/src/gpucheck/arch/compatibility.py
-# hypothesis_version: 6.151.9
-
-['Ada', 'Ampere', 'Blackwell-Consumer', 'Blackwell-DC', 'Hopper', 'No GPU available', 'SM', 'SM100', 'SM120', 'SM70', 'SM75', 'SM80', 'SM86', 'SM89', 'SM90', 'Turing', 'Volta']

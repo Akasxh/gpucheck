@@ -159,7 +159,7 @@ def gpu_tensors(
         else gpu_shapes(min_ndim=min_ndim, max_ndim=max_ndim, min_size=min_size, max_size=max_size)
     )
 
-    @st.composite
+    @st.composite  # type: ignore[untyped-decorator]
     def _draw_tensor(draw: Any) -> Any:
         s = draw(shape_strategy)
         numel = 1

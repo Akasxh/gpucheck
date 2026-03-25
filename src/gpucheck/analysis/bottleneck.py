@@ -41,7 +41,7 @@ class BottleneckAnalysis:
 
 def _sync_gpu() -> None:
     try:
-        import torch  # type: ignore[import-untyped]
+        import torch
 
         if torch.cuda.is_available():
             torch.cuda.synchronize()

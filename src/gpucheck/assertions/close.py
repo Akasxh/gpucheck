@@ -36,7 +36,7 @@ def _to_numpy(tensor: Any) -> npt.NDArray[Any]:
     # __cuda_array_interface__ (e.g. numba, rmm, dlpack-aware objects)
     if hasattr(tensor, "__cuda_array_interface__"):
         try:
-            import cupy as cp  # type: ignore[import-untyped]
+            import cupy as cp
 
             return cp.asarray(tensor).get()  # type: ignore[no-any-return]
         except ImportError:
@@ -48,11 +48,11 @@ def _to_numpy(tensor: Any) -> npt.NDArray[Any]:
             t = torch.as_tensor(tensor).detach().cpu()
             if t.is_floating_point():
                 if t.dtype.itemsize >= 8:
-                    return t.double().numpy()  # type: ignore[no-any-return]
+                    return t.double().numpy()
                 if t.dtype.itemsize >= 4:
-                    return t.numpy()  # type: ignore[no-any-return]
-                return t.float().numpy()  # type: ignore[no-any-return]
-            return t.numpy()  # type: ignore[no-any-return]
+                    return t.numpy()
+                return t.float().numpy()
+            return t.numpy()
         except (ImportError, RuntimeError):
             pass
 

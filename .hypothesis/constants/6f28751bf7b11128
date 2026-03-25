@@ -1,4 +1,0 @@
-# file: /home/akash/PROJECTS/github-projects-all/gpucheck-repo/src/gpucheck/arch/tensor_cores.py
-# hypothesis_version: 6.151.9
-
-[0.0, 1e-07, 0.7, 0.8, 1.5, 128.0, '0', 'NVIDIA_TF32_OVERRIDE', 'bf16', 'bfloat16', 'cuda', 'cudnn', 'float16', 'float32', 'float64', 'float8_e4m3fn', 'float8_e5m2', 'fp16', 'fp64', 'fp8', 'fp8_e4m3', 'fp8_e5m2', 'hopper', 'int4', 'int8', 'tf32', 'torch.', 'volta']

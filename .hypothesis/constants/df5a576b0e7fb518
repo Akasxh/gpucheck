@@ -1,4 +1,0 @@
-# file: /home/akash/PROJECTS/github-projects-all/gpucheck-repo/src/gpucheck/plugin.py
-# hypothesis_version: 6.151.9
-
-[100, '  No GPU detected', '--gpu-device', 'GPU Info', 'GPU kernel testing', 'cuda:0', 'gpu', 'gpucheck', 'markers', 'multi_gpu', 'no GPU available']

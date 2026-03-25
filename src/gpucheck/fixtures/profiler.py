@@ -59,7 +59,7 @@ _LEAK_THRESHOLD_BYTES = 1 * 1024 * 1024
 def _snapshot_pynvml(device_id: int = 0) -> MemorySnapshot | None:
     # Synchronize GPU before taking pynvml snapshot to ensure pending ops complete
     try:
-        import torch  # type: ignore[import-untyped]
+        import torch
 
         if torch.cuda.is_available():
             torch.cuda.synchronize(device_id)
@@ -67,7 +67,7 @@ def _snapshot_pynvml(device_id: int = 0) -> MemorySnapshot | None:
         pass
 
     try:
-        import pynvml  # type: ignore[import-untyped]
+        import pynvml
     except ImportError:
         return None
     try:
@@ -82,7 +82,7 @@ def _snapshot_pynvml(device_id: int = 0) -> MemorySnapshot | None:
 
 def _snapshot_torch(device_id: int = 0) -> MemorySnapshot | None:
     try:
-        import torch  # type: ignore[import-untyped]
+        import torch
     except ImportError:
         return None
     if not torch.cuda.is_available():
@@ -99,7 +99,7 @@ def _snapshot_torch(device_id: int = 0) -> MemorySnapshot | None:
 def _get_peak_torch(device_id: int = 0) -> int | None:
     """Return peak allocated memory from torch's CUDA allocator."""
     try:
-        import torch  # type: ignore[import-untyped]
+        import torch
     except ImportError:
         return None
     if not torch.cuda.is_available():
@@ -120,7 +120,7 @@ def _snapshot(device_id: int = 0) -> MemorySnapshot | None:
 
 def _reset_peak_torch(device_id: int = 0) -> None:
     try:
-        import torch  # type: ignore[import-untyped]
+        import torch
 
         if torch.cuda.is_available():
             torch.cuda.reset_peak_memory_stats(device_id)

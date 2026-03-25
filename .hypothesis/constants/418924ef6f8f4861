@@ -1,4 +1,0 @@
-# file: /home/akash/PROJECTS/github-projects-all/gpucheck-repo/src/gpucheck/analysis/regression.py
-# hypothesis_version: 6.151.9
-
-[-8.0, -2.0, -1.453152027, -1.0, -0.284496736, 0.0, 1e-15, 0.05, 0.254829592, 0.3275911, 0.5, 1.0, 1.061405429, 1.1, 1.421413741, 2.0, 8.0, 12.0, 100.0, 100, '-', '=', 'Benchmark', 'Change', 'Effect (d)', 'IMPROVED', 'OK', 'REGRESSION', 'Regression Report', 'Status', '[dim]OK[/dim]', 'center', 'cyan', 'inf', 'p-value', 'right', 'utf-8']

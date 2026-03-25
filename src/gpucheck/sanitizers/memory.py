@@ -54,7 +54,7 @@ def _get_torch_memory_stats() -> dict[str, int]:
 def _get_pynvml_memory() -> int:
     """Return GPU memory used in bytes via pynvml, 0 if unavailable."""
     try:
-        import pynvml  # type: ignore[import-untyped]
+        import pynvml
 
         pynvml.nvmlInit()
         handle = pynvml.nvmlDeviceGetHandleByIndex(0)
@@ -181,7 +181,7 @@ def memory_guard(threshold_bytes: int = 0) -> Generator[_MutableReport, None, No
 
     # Yield a _MutableReport so caller can inspect after block
     mut = _MutableReport()
-    yield mut  # type: ignore[misc]
+    yield mut
 
     _sync_and_gc()
 
