@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    import numpy as np
     import numpy.typing as npt
 
 
@@ -48,7 +47,8 @@ def format_mismatch_report(
 
     # Relative error: avoid division by zero.
     with np.errstate(divide="ignore", invalid="ignore"):
-        rel_err = np.where(abs_expected_f64 != 0, diff / abs_expected_f64, np.where(diff == 0, 0.0, np.inf))
+        zero_fallback = np.where(diff == 0, 0.0, np.inf)
+        rel_err = np.where(abs_expected_f64 != 0, diff / abs_expected_f64, zero_fallback)
 
     # Mismatch mask: |a - b| > atol + rtol * |b|
     threshold = atol + rtol * abs_expected_f64
@@ -60,7 +60,8 @@ def format_mismatch_report(
 
     max_abs_err = float(np.nanmax(diff)) if diff.size > 0 else 0.0
     mean_abs_err = float(np.nanmean(diff)) if diff.size > 0 else 0.0
-    max_rel_err = float(np.nanmax(rel_err[np.isfinite(rel_err)])) if np.any(np.isfinite(rel_err)) else float("inf")
+    finite_rel = rel_err[np.isfinite(rel_err)]
+    max_rel_err = float(np.nanmax(finite_rel)) if finite_rel.size > 0 else float("inf")
 
     # Location of max absolute error.
     max_idx = np.unravel_index(int(np.nanargmax(diff)), diff.shape) if diff.size > 0 else ()
@@ -90,9 +91,17 @@ def format_mismatch_report(
     histogram = _error_histogram(diff, mismatch_mask)
 
     console = Console(record=True, width=100)
-    console.print(Panel(stats_table, title="[bold red]Tensor Mismatch Report[/bold red]", border_style="red"))
+    console.print(Panel(
+        stats_table,
+        title="[bold red]Tensor Mismatch Report[/bold red]",
+        border_style="red",
+    ))
     if histogram:
-        console.print(Panel(Text(histogram), title="[bold yellow]Error Histogram[/bold yellow]", border_style="yellow"))
+        console.print(Panel(
+            Text(histogram),
+            title="[bold yellow]Error Histogram[/bold yellow]",
+            border_style="yellow",
+        ))
 
     return console.export_text(styles=True)
 

@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Literal, Sequence
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 Bottleneck = Literal["compute_bound", "memory_bound", "balanced"]
 
@@ -286,7 +289,7 @@ def render_roofline_ascii(
 
     if labels is None:
         labels = [f"kernel_{i}" for i in range(len(points))]
-    for i, (pt, lbl) in enumerate(zip(points, labels)):
+    for i, (pt, lbl) in enumerate(zip(points, labels, strict=False)):
         m = markers[i % len(markers)]
         cls = classify_bottleneck(pt)
         lines.append(

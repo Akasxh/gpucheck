@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import statistics
-from dataclasses import dataclass, field
-from typing import Any, Sequence
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,7 +70,9 @@ _STATUS_STYLE: dict[str, str] = {
 class ConsoleReporter:
     """Rich-powered terminal reporter for gpucheck sessions."""
 
-    def __init__(self, *, console: Console | None = None, verbose: bool = False, file: Any = None) -> None:
+    def __init__(
+        self, *, console: Console | None = None, verbose: bool = False, file: Any = None,
+    ) -> None:
         import os
         import sys
 

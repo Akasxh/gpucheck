@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any
 
-from gpucheck.reporting.console import BenchmarkEntry, TestResult
-from gpucheck.reporting.json import JSONReporter
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
+    from gpucheck.reporting.console import TestResult
 
 # ---------------------------------------------------------------------------
 # GitHub Actions annotations
@@ -133,15 +132,9 @@ def generate_pr_comment(
             curr_ms = b.get("current_median_ms", "-")
             delta_pct = b.get("delta_pct", 0)
 
-            if isinstance(base_ms, (int, float)):
-                base_str = f"{base_ms:.3f} ms"
-            else:
-                base_str = str(base_ms)
+            base_str = f"{base_ms:.3f} ms" if isinstance(base_ms, (int, float)) else str(base_ms)
 
-            if isinstance(curr_ms, (int, float)):
-                curr_str = f"{curr_ms:.3f} ms"
-            else:
-                curr_str = str(curr_ms)
+            curr_str = f"{curr_ms:.3f} ms" if isinstance(curr_ms, (int, float)) else str(curr_ms)
 
             if status == "regression":
                 icon = ":red_circle:"

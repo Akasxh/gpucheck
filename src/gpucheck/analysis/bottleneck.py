@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import math
 import time
-from collections.abc import Callable
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,7 +87,11 @@ def _fit_log_log_slope(xs: list[float], ys: list[float]) -> float:
         return 0.0
 
     # Filter pairs jointly to avoid misaligned arrays
-    pairs = [(math.log(x), math.log(y)) for x, y in zip(xs[:n], ys[:n]) if x > 0 and y > 0]
+    pairs = [
+        (math.log(x), math.log(y))
+        for x, y in zip(xs[:n], ys[:n], strict=False)
+        if x > 0 and y > 0
+    ]
     if len(pairs) < 2:
         return 0.0
     lx = [p[0] for p in pairs]
@@ -94,7 +100,7 @@ def _fit_log_log_slope(xs: list[float], ys: list[float]) -> float:
 
     mx = sum(lx) / n
     my = sum(ly) / n
-    num = sum((a - mx) * (b - my) for a, b in zip(lx, ly))
+    num = sum((a - mx) * (b - my) for a, b in zip(lx, ly, strict=False))
     den = sum((a - mx) ** 2 for a in lx)
     if den < 1e-15:
         return 0.0

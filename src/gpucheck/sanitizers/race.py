@@ -8,8 +8,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass, field
-from typing import Any, Callable, Literal
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 SanitizerTool = Literal["memcheck", "racecheck", "initcheck", "synccheck"]
 _VALID_TOOLS: frozenset[str] = frozenset({"memcheck", "racecheck", "initcheck", "synccheck"})
@@ -59,7 +62,9 @@ def _find_compute_sanitizer() -> str | None:
     return None
 
 
-def _parse_sanitizer_output(raw: str, tool: SanitizerTool) -> tuple[list[SanitizerError], list[str]]:
+def _parse_sanitizer_output(
+    raw: str, tool: SanitizerTool,
+) -> tuple[list[SanitizerError], list[str]]:
     """Parse compute-sanitizer text output into errors and warnings."""
     errors: list[SanitizerError] = []
     warnings: list[str] = []

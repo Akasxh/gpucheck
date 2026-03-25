@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 
 from gpucheck.fuzzing.shapes import (
-    PRIMES,
     TILE_SIZES,
     ShapeStrategy,
     _degenerate_shapes,
@@ -130,14 +127,14 @@ class TestShapeStrategyShrinks:
         assert all(isinstance(d, int) for d in example)
 
     def test_strategy_is_search_strategy(self) -> None:
-        hypothesis = pytest.importorskip("hypothesis")
+        pytest.importorskip("hypothesis")
         from hypothesis.strategies import SearchStrategy
 
         strat = ShapeStrategy(ndim=3, min_size=1, max_size=512)
         assert isinstance(strat, SearchStrategy)
 
     def test_strategy_with_hypothesis_given(self) -> None:
-        hypothesis = pytest.importorskip("hypothesis")
+        pytest.importorskip("hypothesis")
         from hypothesis import given, settings
 
         # ShapeStrategy now returns a SearchStrategy directly

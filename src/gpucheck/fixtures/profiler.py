@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @dataclass(frozen=True, slots=True)

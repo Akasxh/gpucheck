@@ -13,10 +13,12 @@ import json
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 # ---------------------------------------------------------------------------
 # Data types
@@ -73,8 +75,8 @@ def mann_whitney_u(
     unique_vals, unique_indices, unique_counts = np.unique(
         sorted_values, return_index=True, return_counts=True
     )
-    tie_counts_list: list[int] = unique_counts.tolist()
-    for idx, count in zip(unique_indices, unique_counts):
+    unique_counts.tolist()
+    for idx, count in zip(unique_indices, unique_counts, strict=False):
         avg_rank = (2 * idx + count + 1) / 2.0  # 1-based average rank
         ranks[idx:idx + count] = avg_rank
 
@@ -236,8 +238,8 @@ def detect_regression(
         Minimum median-ratio (current / baseline) to flag a regression.
         Default 1.1 → current must be ≥ 10 % slower.
     """
-    curr = np.asarray(list(current_results), dtype=np.float64)
-    base = np.asarray(list(baseline_results), dtype=np.float64)
+    curr = np.asarray(current_results, dtype=np.float64)
+    base = np.asarray(baseline_results, dtype=np.float64)
 
     if len(curr) == 0 or len(base) == 0:
         return RegressionReport(
@@ -250,12 +252,12 @@ def detect_regression(
             change_pct=0.0,
         )
 
-    c_med = _median(list(current_results))
-    b_med = _median(list(baseline_results))
+    c_med = float(np.median(curr))
+    b_med = float(np.median(base))
     change_pct = ((c_med - b_med) / b_med * 100.0) if b_med > 0 else 0.0
     effect_ratio = c_med / b_med if b_med > 0 else float("inf")
 
-    _, pvalue = mann_whitney_u(list(baseline_results), list(current_results))
+    _, pvalue = mann_whitney_u(base.tolist(), curr.tolist())
     cohen_d = _cohens_d(curr, base)
 
     # E-Divisive change-point sanity check

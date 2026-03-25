@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 _DEFAULT_TOLERANCES: dict[str, tuple[float, float]] = {
     # dtype_name: (atol, rtol)
@@ -18,7 +20,8 @@ _DEFAULT_TOLERANCES: dict[str, tuple[float, float]] = {
     "tf32": (1e-4, 1e-4),
 }
 
-# Thread-local-style override stack (module-level, not truly thread-safe—fine for pytest).
+# Override stack (module-level). NOT thread-safe — each thread/worker should use
+# its own process (pytest-xdist worker) for parallel test execution.
 _tolerance_overrides: list[tuple[float, float]] = []
 
 
@@ -50,7 +53,11 @@ def compute_tolerance(
         return _tolerance_overrides[-1]
 
     name = _normalize_dtype_name(dtype)
-    atol, rtol = _DEFAULT_TOLERANCES.get(name, _DEFAULT_TOLERANCES["float32"])
+    # Check config overlay first, then defaults
+    if name in _config_overrides:
+        atol, rtol = _config_overrides[name]
+    else:
+        atol, rtol = _DEFAULT_TOLERANCES.get(name, _DEFAULT_TOLERANCES["float32"])
 
     if k_dim is not None and k_dim > 0:
         atol = atol * math.sqrt(k_dim)
@@ -99,8 +106,21 @@ def tolerances_from_config(config: dict[str, Any]) -> dict[str, tuple[float, flo
     return result or None
 
 
+# Overlay dict for config-based overrides (separate from _DEFAULT_TOLERANCES)
+_config_overrides: dict[str, tuple[float, float]] = {}
+
+
 def apply_config_tolerances(config: dict[str, Any]) -> None:
-    """Merge pyproject.toml tolerance overrides into the module-level default table."""
+    """Apply pyproject.toml tolerance overrides as an overlay (non-destructive).
+
+    Overrides are stored separately from the built-in defaults and can be
+    reverted with :func:`reset_config_tolerances`.
+    """
     overrides = tolerances_from_config(config)
     if overrides:
-        _DEFAULT_TOLERANCES.update(overrides)
+        _config_overrides.update(overrides)
+
+
+def reset_config_tolerances() -> None:
+    """Remove all config-based tolerance overrides."""
+    _config_overrides.clear()

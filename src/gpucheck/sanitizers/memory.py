@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import gc
 from contextlib import contextmanager
-from dataclasses import dataclass, field
-from typing import Any, Callable, Generator
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Generator
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,7 +62,7 @@ def _get_pynvml_memory() -> int:
         used: int = info.used
         pynvml.nvmlShutdown()
         return used
-    except Exception:
+    except (ImportError, RuntimeError, OSError):
         return 0
 
 
@@ -160,7 +163,7 @@ def memory_guard(threshold_bytes: int = 0) -> Generator[_MutableReport, None, No
 
     # We build the report as a mutable list, then replace the sentinel.
     # Since SanitizerMemoryReport is frozen we need this indirection.
-    report = SanitizerMemoryReport(leaked_bytes=0, peak_bytes=0, allocations=0, deallocations=0)
+    SanitizerMemoryReport(leaked_bytes=0, peak_bytes=0, allocations=0, deallocations=0)
     # Use object.__new__ trick to yield the same reference, then mutate via
     # __dict__ bypass — or just use a mutable wrapper.
     _holder: dict[str, Any] = {}

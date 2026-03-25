@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 
 from gpucheck.assertions.tolerances import (
     _DEFAULT_TOLERANCES as _CANONICAL_TOLERANCES,
-    _normalize_dtype_name,
 )
 
 if TYPE_CHECKING:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Iterator, Union
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -24,7 +24,14 @@ _STR_TO_DTYPE: dict[str, str] = {
     "float8_e5m2": "torch.float8_e5m2",
 }
 
-DtypeArg = Union[str, Any]  # str | torch.dtype
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
+
+    import torch
+
+    DtypeArg = str | torch.dtype
+else:
+    DtypeArg = str | Any
 
 
 def _resolve_dtype(d: DtypeArg) -> Any:

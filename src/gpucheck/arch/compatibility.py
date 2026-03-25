@@ -15,7 +15,8 @@ if TYPE_CHECKING:
 
     from gpucheck.arch.detection import GPUInfo
 
-# Canonical SM → architecture mapping (including sub-variants)
+# Canonical SM tag → architecture mapping (string keys for SM tag lookups).
+# See also detection.SM_TO_ARCH for the tuple-keyed canonical mapping.
 SM_ARCH_MAP: dict[str, str] = {
     "SM70": "Volta",
     "SM75": "Turing",
@@ -109,8 +110,12 @@ _KNOWN_INCOMPATIBILITIES: dict[tuple[str, str], str] = {
 
 
 def _cc_to_sm_tag(cc: tuple[int, int]) -> str:
-    """Convert compute capability tuple to SM tag like 'SM80'."""
-    return f"SM{cc[0]}{cc[1]}"
+    """Convert compute capability tuple to SM tag like 'SM80'.
+
+    Uses concatenation of major + minor digits, which is the standard NVIDIA
+    convention (e.g., SM80, SM89, SM90, SM100, SM120).
+    """
+    return f"SM{cc[0] * 10 + cc[1]}"
 
 
 def check_compatibility(kernel_target: str, gpu_info: GPUInfo) -> list[str]:

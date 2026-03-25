@@ -4,18 +4,16 @@ from __future__ import annotations
 
 import pytest
 
-from gpucheck.analysis.roofline import (
-    GPUSpecs,
-    RooflinePoint,
-    classify_bottleneck,
-    compute_roofline_point,
-)
 from gpucheck.analysis.regression import (
     RegressionResult,
     detect_regression,
     mann_whitney_u,
 )
-
+from gpucheck.analysis.roofline import (
+    RooflinePoint,
+    classify_bottleneck,
+    compute_roofline_point,
+)
 
 # ---------------------------------------------------------------------------
 # classify_bottleneck

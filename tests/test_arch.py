@@ -2,26 +2,22 @@
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import patch
 
 import pytest
 
-from gpucheck.arch.detection import (
-    GPUInfo,
-    SM_TO_ARCH,
-    _TENSOR_CORE_GEN,
-    _resolve_arch,
-    _tensor_core_gen,
-)
 from gpucheck.arch.compatibility import (
-    SM_ARCH_MAP,
     _cc_to_sm_tag,
-    check_compatibility,
     require_arch,
     require_capability,
 )
-
+from gpucheck.arch.detection import (
+    _TENSOR_CORE_GEN,
+    SM_TO_ARCH,
+    GPUInfo,
+    _resolve_arch,
+    _tensor_core_gen,
+)
 
 # ---------------------------------------------------------------------------
 # GPUInfo dataclass

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-import math
-from typing import Any, Callable
+import contextlib
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -30,7 +33,9 @@ def _torch_mod() -> Any:
 
 def _is_floating(dtype: Any) -> bool:
     torch = _torch_mod()
-    return dtype.is_floating_point if hasattr(dtype, "is_floating_point") else torch.is_floating_point(torch.empty(0, dtype=dtype))
+    if hasattr(dtype, "is_floating_point"):
+        return dtype.is_floating_point
+    return torch.is_floating_point(torch.empty(0, dtype=dtype))
 
 
 def _dtype_info(dtype: Any) -> tuple[float, float, float]:
@@ -46,15 +51,21 @@ def _is_half(dtype: Any) -> bool:
     return dtype in (torch.float16, torch.bfloat16)
 
 
+_FP8_TYPES_CACHE: frozenset[Any] | None = None
+
+
 def _is_fp8(dtype: Any) -> bool:
     """Check if dtype is an fp8 variant."""
-    torch = _torch_mod()
-    fp8_types = []
-    for name in ("float8_e4m3fn", "float8_e5m2", "float8_e4m3fnuz", "float8_e5m2fnuz"):
-        d = getattr(torch, name, None)
-        if d is not None:
-            fp8_types.append(d)
-    return dtype in fp8_types
+    global _FP8_TYPES_CACHE  # noqa: PLW0603
+    if _FP8_TYPES_CACHE is None:
+        torch = _torch_mod()
+        types: list[Any] = []
+        for name in ("float8_e4m3fn", "float8_e5m2", "float8_e4m3fnuz", "float8_e5m2fnuz"):
+            d = getattr(torch, name, None)
+            if d is not None:
+                types.append(d)
+        _FP8_TYPES_CACHE = frozenset(types)
+    return dtype in _FP8_TYPES_CACHE
 
 
 # ---------------------------------------------------------------------------
@@ -117,6 +128,7 @@ def edge_inputs(
     dtype: Any,
     *,
     device: str = "cpu",
+    seed: int | None = None,
 ) -> list[tuple[str, Any]]:
     """Generate tensors with edge-case values for *dtype*.
 
@@ -141,6 +153,11 @@ def edge_inputs(
     torch = _torch_mod()
     results: list[tuple[str, Any]] = []
     is_float = _is_floating(dtype)
+
+    gen: Any = None
+    if seed is not None:
+        gen = torch.Generator(device="cpu")
+        gen.manual_seed(seed)
 
     def _make(val: float, label: str) -> None:
         try:
@@ -175,16 +192,14 @@ def edge_inputs(
             (float("inf"), "sprinkled_inf"),
             (float("-inf"), "sprinkled_neg_inf"),
         ]:
-            base = torch.randn(shape, dtype=torch.float32, device="cpu")
+            base = torch.randn(shape, generator=gen, dtype=torch.float32, device="cpu")
             numel = base.numel()
             if numel > 0:
                 # Sprinkle ~10% special values.
-                mask = torch.rand(shape) < 0.1
+                mask = torch.rand(shape, generator=gen) < 0.1
                 base[mask] = special_val
-            try:
+            with contextlib.suppress(RuntimeError, OverflowError):
                 results.append((label, base.to(dtype=dtype, device=device)))
-            except (RuntimeError, OverflowError):
-                pass
 
         # Denormals for half-precision types.
         if _is_half(dtype) or _is_fp8(dtype):
@@ -219,8 +234,10 @@ def mixed_inputs(
     results: list[tuple[str, Any]] = []
 
     # Normal distribution samples.
-    results.append(("normal", random_inputs(shape, dtype, distribution="normal", device=device, seed=seed)))
-    results.append(("uniform", random_inputs(shape, dtype, distribution="uniform", device=device, seed=seed)))
+    normal = random_inputs(shape, dtype, distribution="normal", device=device, seed=seed)
+    results.append(("normal", normal))
+    uniform = random_inputs(shape, dtype, distribution="uniform", device=device, seed=seed)
+    results.append(("uniform", uniform))
 
     # Edge cases.
     results.extend(edge_inputs(shape, dtype, device=device))
@@ -237,10 +254,8 @@ def mixed_inputs(
             for i, v in enumerate(specials):
                 if i < flat.numel():
                     flat[i] = v
-        try:
+        with contextlib.suppress(RuntimeError, OverflowError):
             results.append(("mixed_normal_edge", base.to(dtype=dtype, device=device)))
-        except (RuntimeError, OverflowError):
-            pass
 
     return results
 

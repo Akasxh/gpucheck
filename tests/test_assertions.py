@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-from typing import Any
 
 import numpy as np
 import pytest
@@ -12,13 +11,10 @@ from gpucheck.assertions.close import assert_close
 from gpucheck.assertions.reporting import format_mismatch_report
 from gpucheck.assertions.tolerances import (
     _DEFAULT_TOLERANCES,
-    _normalize_dtype_name,
     compute_tolerance,
     tolerance_context,
 )
-
 from tests.conftest import make_close_tensors, make_divergent_tensors, make_exact_tensors
-
 
 # ---------------------------------------------------------------------------
 # assert_close

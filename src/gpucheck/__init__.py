@@ -8,33 +8,38 @@ from typing import TYPE_CHECKING, Any
 __version__ = "0.1.0"
 
 
+_LAZY_MAP: dict[str, tuple[str, str]] = {
+    "assert_close": ("gpucheck.assertions", "assert_close"),
+    "dtypes": ("gpucheck.decorators", "dtypes"),
+    "shapes": ("gpucheck.decorators", "shapes"),
+    "devices": ("gpucheck.decorators", "devices"),
+    "parametrize_gpu": ("gpucheck.decorators", "parametrize_gpu"),
+    "FLOAT_DTYPES": ("gpucheck.decorators", "FLOAT_DTYPES"),
+    "HALF_DTYPES": ("gpucheck.decorators", "HALF_DTYPES"),
+    "ALL_DTYPES": ("gpucheck.decorators", "ALL_DTYPES"),
+    "FP8_DTYPES": ("gpucheck.decorators", "FP8_DTYPES"),
+    "SMALL_SHAPES": ("gpucheck.decorators", "SMALL_SHAPES"),
+    "MEDIUM_SHAPES": ("gpucheck.decorators", "MEDIUM_SHAPES"),
+    "LARGE_SHAPES": ("gpucheck.decorators", "LARGE_SHAPES"),
+    "EDGE_SHAPES": ("gpucheck.decorators", "EDGE_SHAPES"),
+    "fuzz_shapes": ("gpucheck.fuzzing", "fuzz_shapes"),
+    "GPUInfo": ("gpucheck.arch", "GPUInfo"),
+    "detect_gpu": ("gpucheck.arch", "detect_gpu"),
+    "gpu_available": ("gpucheck.arch", "gpu_available"),
+    "gpu_count": ("gpucheck.arch", "gpu_count"),
+    "BenchmarkResult": ("gpucheck.fixtures.benchmark", "BenchmarkResult"),
+    "GPUDevice": ("gpucheck.fixtures.gpu", "GPUDevice"),
+}
+
+
 def __getattr__(name: str) -> Any:
-    _lazy_map: dict[str, tuple[str, str]] = {
-        "assert_close": ("gpucheck.assertions", "assert_close"),
-        "dtypes": ("gpucheck.decorators", "dtypes"),
-        "shapes": ("gpucheck.decorators", "shapes"),
-        "devices": ("gpucheck.decorators", "devices"),
-        "parametrize_gpu": ("gpucheck.decorators", "parametrize_gpu"),
-        "FLOAT_DTYPES": ("gpucheck.decorators", "FLOAT_DTYPES"),
-        "HALF_DTYPES": ("gpucheck.decorators", "HALF_DTYPES"),
-        "ALL_DTYPES": ("gpucheck.decorators", "ALL_DTYPES"),
-        "FP8_DTYPES": ("gpucheck.decorators", "FP8_DTYPES"),
-        "SMALL_SHAPES": ("gpucheck.decorators", "SMALL_SHAPES"),
-        "MEDIUM_SHAPES": ("gpucheck.decorators", "MEDIUM_SHAPES"),
-        "LARGE_SHAPES": ("gpucheck.decorators", "LARGE_SHAPES"),
-        "EDGE_SHAPES": ("gpucheck.decorators", "EDGE_SHAPES"),
-        "fuzz_shapes": ("gpucheck.fuzzing", "fuzz_shapes"),
-        "GPUInfo": ("gpucheck.arch", "GPUInfo"),
-        "detect_gpu": ("gpucheck.arch", "detect_gpu"),
-        "gpu_available": ("gpucheck.arch", "gpu_available"),
-        "gpu_count": ("gpucheck.arch", "gpu_count"),
-        "BenchmarkResult": ("gpucheck.fixtures.benchmark", "BenchmarkResult"),
-        "GPUDevice": ("gpucheck.fixtures.gpu", "GPUDevice"),
-    }
-    if name in _lazy_map:
-        module_path, attr = _lazy_map[name]
+    if name in _LAZY_MAP:
+        module_path, attr = _LAZY_MAP[name]
         mod = importlib.import_module(module_path)
-        return getattr(mod, attr)
+        # Cache in globals to avoid repeated import on next access
+        value = getattr(mod, attr)
+        globals()[name] = value
+        return value
     raise AttributeError(f"module 'gpucheck' has no attribute {name!r}")
 
 

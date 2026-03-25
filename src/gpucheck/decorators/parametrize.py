@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import itertools
-from typing import Any, Callable, Sequence
+from collections.abc import Callable, Sequence
+from typing import Any
 
 import pytest
 

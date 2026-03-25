@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any
 
 import pytest
@@ -110,10 +111,8 @@ def gpu_device() -> Any:
     gen = _gpu_device_impl()
     device = next(gen)
     yield device
-    try:
+    with contextlib.suppress(StopIteration):
         next(gen)
-    except StopIteration:
-        pass
 
 
 @pytest.fixture()

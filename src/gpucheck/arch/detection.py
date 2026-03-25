@@ -12,6 +12,9 @@ logger = logging.getLogger(__name__)
 
 # SM version → architecture name
 SM_TO_ARCH: dict[tuple[int, int], str] = {
+    (6, 0): "Pascal",
+    (6, 1): "Pascal",
+    (6, 2): "Pascal",
     (7, 0): "Volta",
     (7, 2): "Volta",
     (7, 5): "Turing",
@@ -67,6 +70,8 @@ def _resolve_arch(cc: tuple[int, int]) -> str:
         return "Turing"
     if cc >= (7, 0):
         return "Volta"
+    if cc >= (6, 0):
+        return "Pascal"
     return "Unknown"
 
 
@@ -138,23 +143,20 @@ def _detect_via_pynvml() -> list[GPUInfo] | None:
             if isinstance(name, bytes):
                 name = name.decode()
 
-            cc_major = pynvml.nvmlDeviceGetCudaComputeCapability(handle)
-            if isinstance(cc_major, tuple):
-                cc = (cc_major[0], cc_major[1])
+            cc_result = pynvml.nvmlDeviceGetCudaComputeCapability(handle)
+            if isinstance(cc_result, tuple):
+                cc = (cc_result[0], cc_result[1])
             else:
-                cc_minor = 0
-                # Some pynvml versions return (major, minor) tuple directly
-                cc = (cc_major, cc_minor)
+                # All known pynvml versions return a tuple; this is a safety fallback
+                cc = (int(cc_result), 0)
 
             mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
             total_mb = mem_info.total // (1024 * 1024)
             free_mb = mem_info.free // (1024 * 1024)
 
-            try:
-                max_smem = pynvml.nvmlDeviceGetMaxSharedMemoryPerBlock(handle)
-            except (AttributeError, pynvml.NVMLError):
-                # Fallback: typical defaults by arch
-                max_smem = _default_shared_memory(cc)
+            # nvmlDeviceGetMaxSharedMemoryPerBlock is not part of the official
+            # NVML API; always fall back to defaults based on compute capability.
+            max_smem = _default_shared_memory(cc)
 
             gpus.append(GPUInfo(
                 device_id=i,

@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import json
-import os
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any
 
-from gpucheck.reporting.console import BenchmarkEntry, MemoryEntry, TestResult
+if TYPE_CHECKING:
+    from gpucheck.reporting.console import BenchmarkEntry, MemoryEntry, TestResult
 
 
 @dataclass(slots=True)
@@ -120,7 +120,8 @@ class JSONReporter:
                 entry["delta_pct"] = (
                     ((curr_med - base_med) / base_med * 100) if base_med > 0 else 0.0
                 )
-                entry["status"] = "regression" if curr_med > base_med * (1.0 + regression_threshold) else "ok"
+                is_regr = curr_med > base_med * (1.0 + regression_threshold)
+                entry["status"] = "regression" if is_regr else "ok"
             elif curr:
                 entry["status"] = "new"
                 entry["current_median_ms"] = curr["median_ms"]

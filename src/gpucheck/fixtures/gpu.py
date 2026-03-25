@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import contextlib
 import gc
 import warnings
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,10 +83,8 @@ def _detect_gpu_pynvml() -> GPUDevice | None:
     except pynvml.NVMLError:
         return None
     finally:
-        try:
+        with contextlib.suppress(pynvml.NVMLError):
             pynvml.nvmlShutdown()
-        except pynvml.NVMLError:
-            pass
 
 
 def _detect_gpu_torch() -> GPUDevice | None:

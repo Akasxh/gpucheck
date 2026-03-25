@@ -5,15 +5,15 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import patch
 
-import pytest
-
+from gpucheck.decorators.devices import devices
 from gpucheck.decorators.dtypes import (
     FLOAT_DTYPES_NAMES,
     HALF_DTYPES_NAMES,
-    _DtypeGroup,
     _dtype_id,
+    _DtypeGroup,
     dtypes,
 )
+from gpucheck.decorators.parametrize import parametrize_gpu
 from gpucheck.decorators.shapes import (
     EDGE_SHAPES,
     LARGE_SHAPES,
@@ -21,9 +21,6 @@ from gpucheck.decorators.shapes import (
     SMALL_SHAPES,
     shapes,
 )
-from gpucheck.decorators.devices import devices
-from gpucheck.decorators.parametrize import parametrize_gpu
-
 
 # ---------------------------------------------------------------------------
 # dtypes decorator
@@ -34,14 +31,12 @@ class TestDtypesDecoratorParametrizes:
     """@dtypes should produce pytest.mark.parametrize over dtype param."""
 
     def test_creates_parametrize_marker(self) -> None:
-        import torch
 
         decorator = dtypes("float32", "float16")
         # The decorator is a pytest.mark.parametrize instance
         assert hasattr(decorator, "args") or hasattr(decorator, "mark")
 
     def test_parametrize_applied_to_function(self) -> None:
-        import torch
 
         @dtypes("float32", "float16")
         def dummy(dtype: Any) -> None:
@@ -141,7 +136,6 @@ class TestStackedDecoratorsCartesianProduct:
     """Stacking @dtypes and @shapes should produce their cartesian product."""
 
     def test_stacked_marks(self) -> None:
-        import torch
 
         @dtypes("float32", "float16")
         @shapes((32, 32), (64, 64))
@@ -165,7 +159,6 @@ class TestParametrizeGpuAllInOne:
     """@parametrize_gpu should produce a single parametrize with cartesian product."""
 
     def test_creates_combined_parametrize(self) -> None:
-        import torch
 
         decorator = parametrize_gpu(
             dtypes=("float32",),
@@ -185,7 +178,6 @@ class TestParametrizeGpuAllInOne:
         assert "device" in param_mark[0].args[0]
 
     def test_cartesian_product_count(self) -> None:
-        import torch
 
         decorator = parametrize_gpu(
             dtypes=("float32", "float16"),

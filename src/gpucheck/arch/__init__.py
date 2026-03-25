@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from gpucheck.arch.compatibility import require_arch, require_capability
 from gpucheck.arch.detection import GPUInfo, detect_gpus
+from gpucheck.arch.tensor_cores import supports_tensor_cores, warn_tensor_core_fallback
 
 
 def gpu_available() -> bool:
@@ -30,4 +31,6 @@ __all__ = [
     "gpu_count",
     "require_arch",
     "require_capability",
+    "supports_tensor_cores",
+    "warn_tensor_core_fallback",
 ]

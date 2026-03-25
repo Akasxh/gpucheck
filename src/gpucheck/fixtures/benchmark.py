@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 import warnings
 from dataclasses import dataclass, field
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 import pytest
 
@@ -84,7 +84,7 @@ def _get_l2_cache_size() -> int:
                 pass
         finally:
             pynvml.nvmlShutdown()
-    except (ImportError, Exception):  # noqa: BLE001
+    except (ImportError, RuntimeError, OSError):
         pass
     return 40 * 1024 * 1024  # 40 MB default
 
