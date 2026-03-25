@@ -10,6 +10,8 @@ __version__ = "0.1.0"
 
 _LAZY_MAP: dict[str, tuple[str, str]] = {
     "assert_close": ("gpucheck.assertions", "assert_close"),
+    "compute_tolerance": ("gpucheck.assertions", "compute_tolerance"),
+    "tolerance_context": ("gpucheck.assertions", "tolerance_context"),
     "dtypes": ("gpucheck.decorators", "dtypes"),
     "shapes": ("gpucheck.decorators", "shapes"),
     "devices": ("gpucheck.decorators", "devices"),
