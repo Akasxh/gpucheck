@@ -75,17 +75,30 @@ def _resolve_arch(cc: tuple[int, int]) -> str:
     return "Unknown"
 
 
-def _tensor_core_gen(cc: tuple[int, int]) -> int | None:
-    """Return tensor core generation or None if no tensor cores."""
+def _tensor_core_gen(cc: tuple[int, int], name: str = "") -> int | None:
+    """Return tensor core generation or None if no tensor cores.
+
+    GTX 16xx / MX series share SM 7.5 with RTX Turing but lack tensor cores.
+    """
+    tc_gen: int | None = None
     if cc in _TENSOR_CORE_GEN:
-        return _TENSOR_CORE_GEN[cc]
-    # Best-effort by major version
-    for (major, _minor), gen in sorted(_TENSOR_CORE_GEN.items(), reverse=True):
-        if cc[0] == major and cc >= (major, _minor):
-            return gen
+        tc_gen = _TENSOR_CORE_GEN[cc]
+    else:
+        # Best-effort by major version
+        for (major, _minor), gen in sorted(_TENSOR_CORE_GEN.items(), reverse=True):
+            if cc[0] == major and cc >= (major, _minor):
+                tc_gen = gen
+                break
     if cc < (7, 0):
         return None
-    return None
+
+    # GTX 16xx (TU116/TU117) and MX series lack tensor cores despite SM 7.5
+    if tc_gen is not None and tc_gen > 0:
+        upper = name.upper()
+        if any(tag in upper for tag in ("GTX 16", "GTX16", "MX")):
+            return None
+
+    return tc_gen
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,7 +184,7 @@ def _detect_via_pynvml() -> list[GPUInfo] | None:
                 supports_bf16=cc >= _BF16_MIN_CC,
                 supports_fp8=cc >= _FP8_MIN_CC,
                 supports_tf32=cc >= _TF32_MIN_CC,
-                tensor_core_generation=_tensor_core_gen(cc),
+                tensor_core_generation=_tensor_core_gen(cc, name),
                 max_shared_memory_per_block=max_smem,
             ))
     finally:
@@ -225,7 +238,7 @@ def _detect_via_torch() -> list[GPUInfo] | None:
             supports_bf16=cc >= _BF16_MIN_CC,
             supports_fp8=cc >= _FP8_MIN_CC,
             supports_tf32=cc >= _TF32_MIN_CC,
-            tensor_core_generation=_tensor_core_gen(cc),
+            tensor_core_generation=_tensor_core_gen(cc, props.name),
             max_shared_memory_per_block=max_smem,
         ))
 

@@ -161,11 +161,7 @@ def memory_guard(threshold_bytes: int = 0) -> Generator[_MutableReport, None, No
     except ImportError:
         pass
 
-    # We build the report as a mutable list, then replace the sentinel.
-    # Since SanitizerMemoryReport is frozen we need this indirection.
-    SanitizerMemoryReport(leaked_bytes=0, peak_bytes=0, allocations=0, deallocations=0)
-    # Use object.__new__ trick to yield the same reference, then mutate via
-    # __dict__ bypass — or just use a mutable wrapper.
+    # Use a mutable wrapper so the caller can inspect the report after the block.
     _holder: dict[str, Any] = {}
 
     if torch_available:

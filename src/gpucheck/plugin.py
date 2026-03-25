@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 from typing import Any
 
 import pytest
@@ -102,17 +101,8 @@ def gpu_benchmark(request: pytest.FixtureRequest) -> Any:
     return _BenchmarkRunner(warmup=warmup, rounds=rounds)
 
 
-@pytest.fixture()
-def gpu_device() -> Any:
-    """Provide a GPU device for the test, skip if none available."""
-    from gpucheck.fixtures.gpu import gpu_device as _gpu_device_impl
-
-    # Delegate to the actual generator-based fixture
-    gen = _gpu_device_impl()
-    device = next(gen)
-    yield device
-    with contextlib.suppress(StopIteration):
-        next(gen)
+# Re-export the canonical gpu_device fixture so pytest discovers it from this plugin.
+from gpucheck.fixtures.gpu import gpu_device as gpu_device  # noqa: F401, E402
 
 
 @pytest.fixture()

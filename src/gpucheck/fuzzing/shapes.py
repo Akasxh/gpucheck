@@ -158,6 +158,16 @@ def fuzz_shapes(
     if len(unique) >= n:
         return unique[:n]
 
+    # For ndim=0, the only possible shape is (), so we can't generate more.
+    if ndim == 0:
+        return unique
+
+    # Cap n at the number of unique shapes that can be generated.
+    dim_range = max_size - min_size + 1
+    max_possible = dim_range ** ndim
+    if n > len(unique) + max_possible:
+        n = len(unique) + max_possible
+
     # Pad with random shapes to reach n.
     rng = random.Random(seed)
     while len(unique) < n:

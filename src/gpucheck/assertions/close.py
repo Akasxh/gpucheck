@@ -10,6 +10,14 @@ import numpy.typing as npt
 from gpucheck.assertions.reporting import format_mismatch_report
 from gpucheck.assertions.tolerances import compute_tolerance
 
+try:
+    import torch as _torch
+
+    _has_torch = True
+except ImportError:
+    _torch = None  # type: ignore[assignment]
+    _has_torch = False
+
 
 def _to_numpy(tensor: Any) -> npt.NDArray[Any]:
     """Convert tensor-like to numpy, handling torch, cupy, and __cuda_array_interface__."""
@@ -100,6 +108,7 @@ def assert_close(
     """
     dtype = _resolve_dtype(actual, expected)
 
+    # --- Compute effective tolerances up-front (needed by both paths) ---
     if baseline_2x and atol is None and rtol is None:
         # FlashAttention 2x: double base tolerance BEFORE k_dim scaling
         base_atol, base_rtol = compute_tolerance(dtype)
@@ -119,6 +128,18 @@ def assert_close(
             eff_atol *= 2.0
             eff_rtol *= 2.0
 
+    # --- GPU fast-path: avoid CPU transfer when tensors match ---
+    if (
+        _has_torch
+        and isinstance(actual, _torch.Tensor)
+        and isinstance(expected, _torch.Tensor)
+        and actual.device.type == "cuda"
+        and expected.device.type == "cuda"
+        and _torch.allclose(actual, expected, atol=eff_atol, rtol=eff_rtol, equal_nan=nan_equal)
+    ):
+        return  # PASS — no CPU transfer needed
+
+    # --- Slow path: rich error reporting via numpy ---
     actual_np = _to_numpy(actual)
     expected_np = _to_numpy(expected)
 
