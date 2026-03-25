@@ -137,11 +137,19 @@ def _mean_abs_diff_within(a: np.ndarray) -> float:
     return float(np.sum(diffs)) / (n * (n - 1))
 
 
-def e_divisive_single(series: np.ndarray, min_segment: int = 5) -> int | None:
+def e_divisive_single(
+    series: np.ndarray,
+    min_segment: int = 5,
+    max_samples: int = 200,
+) -> int | None:
     """Find the best single change point using the E-Divisive energy statistic.
 
     Returns the split index τ (first element of right segment), or ``None``
     if the series is too short.
+
+    For large series (n > *max_samples*), a uniform sub-sample of candidate
+    split points is evaluated to keep runtime manageable (O(n^2) per
+    candidate instead of exhaustive O(n^3)).
     """
     n = len(series)
     if n < 2 * min_segment:
@@ -150,7 +158,13 @@ def e_divisive_single(series: np.ndarray, min_segment: int = 5) -> int | None:
     best_stat = -math.inf
     best_tau: int | None = None
 
-    for tau in range(min_segment, n - min_segment + 1):
+    candidates = list(range(min_segment, n - min_segment + 1))
+    # Sub-sample candidate split points for large series to reduce O(n^3)
+    if len(candidates) > max_samples:
+        step = max(1, len(candidates) // max_samples)
+        candidates = candidates[::step]
+
+    for tau in candidates:
         left, right = series[:tau], series[tau:]
         nl, nr = len(left), len(right)
         cross = _mean_abs_diff_cross(left, right)

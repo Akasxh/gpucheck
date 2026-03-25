@@ -53,7 +53,13 @@ def _time_kernel(
     warmup: int,
     rounds: int,
 ) -> float:
-    """Return median wall-clock time (seconds) for ``fn(size)``."""
+    """Return median wall-clock time (seconds) for ``fn(size)``.
+
+    .. note::
+        This uses CPU-side ``time.perf_counter()`` with ``torch.cuda.synchronize()``
+        barriers for quick bottleneck classification only. For accurate GPU kernel
+        timing, use the ``gpu_benchmark`` fixture which employs CUDA events.
+    """
     _sync_gpu()
     for _ in range(warmup):
         fn(size)

@@ -64,6 +64,9 @@ def test_memory_tracking(memory_tracker):
 
     del x, y
 
+    report = memory_tracker.stop()
     print(f"\nMemory tracking:")
-    print(f"  Before: {memory_tracker.before_mb:.1f} MB")
-    # after_mb and peak_mb are populated after yield
+    print(f"  Before: {report.before.used_mb:.1f} MB")
+    print(f"  After:  {report.after.used_mb:.1f} MB")
+    print(f"  Peak:   {report.peak_mb:.1f} MB")
+    print(f"  Leaked: {report.leaked_mb:.1f} MB")

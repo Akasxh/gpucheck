@@ -44,7 +44,7 @@ def test_relu_kernel(dtype, shape):
     gc.assert_close(output, reference)
 
 
-@gc.shapes(*gc.decorators.EDGE_SHAPES)
+@gc.shapes(*gc.EDGE_SHAPES)
 def test_edge_case_shapes(shape):
     """Test with adversarial shapes (primes, zeros, ones)."""
     # Skip zero-dimension shapes that would produce empty tensors

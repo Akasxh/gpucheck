@@ -6,6 +6,11 @@ import math
 import warnings
 from typing import TYPE_CHECKING
 
+from gpucheck.assertions.tolerances import (
+    _DEFAULT_TOLERANCES as _CANONICAL_TOLERANCES,
+    _normalize_dtype_name,
+)
+
 if TYPE_CHECKING:
     from gpucheck.arch.detection import GPUInfo
 
@@ -26,21 +31,18 @@ _DTYPE_TC_MIN_GEN: dict[str, int] = {
     "int4": 2,
 }
 
-# Base tolerances (atol, rtol) per dtype
-_BASE_TOLERANCE: dict[str, tuple[float, float]] = {
-    "float16": (1e-3, 1e-3),
-    "fp16": (1e-3, 1e-3),
-    "bfloat16": (1e-2, 1.6e-2),
-    "bf16": (1e-2, 1.6e-2),
-    "float8_e4m3fn": (5e-2, 5e-2),
-    "float8_e5m2": (1e-1, 1e-1),
-    "fp8": (5e-2, 5e-2),
-    "fp8_e4m3": (5e-2, 5e-2),
-    "fp8_e5m2": (1e-1, 1e-1),
-    "tf32": (1e-4, 1.3e-4),
-    "float32": (1e-5, 1.3e-6),
-    "float64": (1e-12, 1e-12),
-    "fp64": (1e-12, 1e-12),
+# Alias map for short dtype names to canonical names in _CANONICAL_TOLERANCES.
+_DTYPE_ALIASES: dict[str, str] = {
+    "fp16": "float16",
+    "bf16": "bfloat16",
+    "fp8": "float8_e4m3fn",
+    "fp8_e4m3": "float8_e4m3fn",
+    "fp8_e5m2": "float8_e5m2",
+    "fp64": "float64",
+}
+
+# Additional tolerances for dtype names not in the canonical table.
+_EXTRA_TOLERANCES: dict[str, tuple[float, float]] = {
     "int8": (0.0, 0.0),
 }
 
@@ -75,6 +77,23 @@ def supports_tensor_cores(gpu_info: GPUInfo, dtype: str) -> bool:
     return gpu_info.tensor_core_generation >= min_gen
 
 
+def _resolve_base_tolerance(dtype_norm: str) -> tuple[float, float]:
+    """Look up base tolerance from the canonical table in tolerances.py.
+
+    Resolves short aliases (fp16, bf16, etc.) and falls back to float32.
+    """
+    # Try canonical name first
+    canonical = _DTYPE_ALIASES.get(dtype_norm, dtype_norm)
+    result = _CANONICAL_TOLERANCES.get(canonical)
+    if result is not None:
+        return result
+    # Check extra tolerances (e.g. int8)
+    result = _EXTRA_TOLERANCES.get(dtype_norm)
+    if result is not None:
+        return result
+    return _CANONICAL_TOLERANCES["float32"]
+
+
 def compute_tolerance(
     dtype: str,
     k_dim: int,
@@ -84,11 +103,15 @@ def compute_tolerance(
 
     Error in floating-point matmul scales roughly as O(sqrt(k)) due to
     random rounding. We scale base tolerance by sqrt(k / 128) where 128
-    is a reference dimension.
+    is a reference tile dimension (standard CUDA warp-multiple tile size).
 
     Additional scaling is applied based on GPU architecture:
     - Older architectures with less precise tensor cores get wider tolerance.
     - FP8 on Hopper gets tighter tolerance than FP8 on Ada (better HW rounding).
+
+    Base tolerances are sourced from :mod:`gpucheck.assertions.tolerances`
+    (single source of truth) with architecture-specific adjustments applied
+    as multipliers.
 
     Args:
         dtype: Data type string.
@@ -99,7 +122,7 @@ def compute_tolerance(
         (atol, rtol) tuple.
     """
     norm = _normalize_dtype(dtype)
-    base_atol, base_rtol = _BASE_TOLERANCE.get(norm, (1e-3, 1e-3))
+    base_atol, base_rtol = _resolve_base_tolerance(norm)
 
     # Scale by sqrt(k / 128)
     k_scale = math.sqrt(max(k_dim, 1) / 128.0)

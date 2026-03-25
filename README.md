@@ -11,12 +11,13 @@ GPU kernel testing is painful. You write a CUDA kernel, eyeball `torch.allclose`
 
 ```python
 import torch
-from gpucheck import assert_close, dtypes, shapes
+from gpucheck import assert_close, dtypes, shapes, devices
 
 @dtypes("float16", "bfloat16", "float32")
 @shapes((128, 128), (512, 512), (1024, 1024))
-def test_relu_kernel(dtype, shape):
-    x = torch.randn(shape, dtype=dtype, device="cuda")
+@devices("cuda:0")
+def test_relu_kernel(dtype, shape, device):
+    x = torch.randn(shape, dtype=dtype, device=device)
     result = torch.relu(x)
     expected = torch.clamp(x, min=0)
     assert_close(result, expected)  # tolerances auto-selected by dtype
@@ -185,7 +186,7 @@ Shape categories (ranked by bug-finding probability):
 Track GPU memory across a test and catch leaks:
 
 ```python
-# Fixture-based tracking
+# Fixture-based tracking (uses fixtures.profiler.MemoryReport)
 def test_no_leak(memory_tracker):
     x = torch.randn(1024, 1024, device="cuda")
     result = my_kernel(x)
@@ -193,7 +194,7 @@ def test_no_leak(memory_tracker):
     torch.cuda.empty_cache()
 
     report = memory_tracker.stop()
-    assert not report.leak_detected
+    assert not report.leak_detected   # .leak_detected on fixture MemoryReport
 
 # Context manager for inline checks
 from gpucheck.sanitizers import memory_guard
@@ -201,13 +202,13 @@ from gpucheck.sanitizers import memory_guard
 def test_memory_bounded():
     with memory_guard(threshold_bytes=10 * 1024 * 1024) as report:
         run_kernel()
-    assert report.leaked_mb < 1.0
+    assert report.leaked_mb < 1.0     # .leaked_mb on sanitizer _MutableReport
 
-# Function-level check
+# Function-level check (uses sanitizers.memory.MemoryReport)
 from gpucheck.sanitizers import check_memory_leaks
 
 report = check_memory_leaks(my_kernel, input_tensor)
-assert not report.has_leak
+assert not report.has_leak            # .has_leak on sanitizer MemoryReport
 ```
 
 ### Architecture detection

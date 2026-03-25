@@ -18,7 +18,13 @@ def _to_numpy(tensor: Any) -> npt.NDArray[Any]:
 
     # torch.Tensor
     if hasattr(tensor, "detach"):
-        return tensor.detach().cpu().float().numpy()  # type: ignore[no-any-return]
+        t = tensor.detach().cpu()
+        # Preserve float64 precision; only cast non-numpy-compatible dtypes
+        if t.is_floating_point():
+            if t.dtype.itemsize >= 8:
+                return t.double().numpy()  # type: ignore[no-any-return]
+            return t.float().numpy()  # type: ignore[no-any-return]
+        return t.numpy()  # type: ignore[no-any-return]
 
     # cupy.ndarray or anything with .get()
     if hasattr(tensor, "get"):
@@ -36,8 +42,12 @@ def _to_numpy(tensor: Any) -> npt.NDArray[Any]:
         try:
             import torch
 
-            t = torch.as_tensor(tensor)
-            return t.detach().cpu().float().numpy()  # type: ignore[no-any-return]
+            t = torch.as_tensor(tensor).detach().cpu()
+            if t.is_floating_point():
+                if t.dtype.itemsize >= 8:
+                    return t.double().numpy()  # type: ignore[no-any-return]
+                return t.float().numpy()  # type: ignore[no-any-return]
+            return t.numpy()  # type: ignore[no-any-return]
         except (ImportError, RuntimeError):
             pass
 
@@ -101,8 +111,8 @@ def assert_close(
             f"Shape mismatch: actual {actual_np.shape} vs expected {expected_np.shape}"
         )
 
-    actual_f64 = actual_np.astype(np.float64)
-    expected_f64 = expected_np.astype(np.float64)
+    actual_f64 = actual_np.astype(np.float64, copy=False)
+    expected_f64 = expected_np.astype(np.float64, copy=False)
 
     # --- Handle NaN ---
     nan_actual = np.isnan(actual_f64)
@@ -112,7 +122,10 @@ def assert_close(
         # NaN in same position → ok.  NaN in only one → mismatch.
         nan_mismatch = nan_actual != nan_expected
         if np.any(nan_mismatch):
-            report = format_mismatch_report(actual_np, expected_np, eff_atol, eff_rtol)
+            report = format_mismatch_report(
+                actual_np, expected_np, eff_atol, eff_rtol,
+                actual_f64=actual_f64, expected_f64=expected_f64,
+            )
             prefix = f"{msg}\n" if msg else ""
             raise AssertionError(
                 f"{prefix}NaN position mismatch: "
@@ -123,7 +136,10 @@ def assert_close(
     else:
         # Any NaN in either tensor is an immediate failure.
         if np.any(nan_actual) or np.any(nan_expected):
-            report = format_mismatch_report(actual_np, expected_np, eff_atol, eff_rtol)
+            report = format_mismatch_report(
+                actual_np, expected_np, eff_atol, eff_rtol,
+                actual_f64=actual_f64, expected_f64=expected_f64,
+            )
             prefix = f"{msg}\n" if msg else ""
             raise AssertionError(
                 f"{prefix}Tensors contain NaN values "
@@ -137,7 +153,10 @@ def assert_close(
     inf_expected = np.isinf(expected_f64)
     inf_mismatch = inf_actual != inf_expected
     if np.any(inf_mismatch):
-        report = format_mismatch_report(actual_np, expected_np, eff_atol, eff_rtol)
+        report = format_mismatch_report(
+                actual_np, expected_np, eff_atol, eff_rtol,
+                actual_f64=actual_f64, expected_f64=expected_f64,
+            )
         prefix = f"{msg}\n" if msg else ""
         raise AssertionError(
             f"{prefix}Inf position mismatch: "
@@ -148,7 +167,10 @@ def assert_close(
     if np.any(both_inf):
         sign_mismatch = np.sign(actual_f64[both_inf]) != np.sign(expected_f64[both_inf])
         if np.any(sign_mismatch):
-            report = format_mismatch_report(actual_np, expected_np, eff_atol, eff_rtol)
+            report = format_mismatch_report(
+                actual_np, expected_np, eff_atol, eff_rtol,
+                actual_f64=actual_f64, expected_f64=expected_f64,
+            )
             prefix = f"{msg}\n" if msg else ""
             raise AssertionError(
                 f"{prefix}Inf sign mismatch at {int(np.sum(sign_mismatch))} positions.\n{report}"
@@ -164,6 +186,9 @@ def assert_close(
     failures = diff > threshold
 
     if np.any(failures):
-        report = format_mismatch_report(actual_np, expected_np, eff_atol, eff_rtol)
+        report = format_mismatch_report(
+                actual_np, expected_np, eff_atol, eff_rtol,
+                actual_f64=actual_f64, expected_f64=expected_f64,
+            )
         prefix = f"{msg}\n" if msg else ""
         raise AssertionError(f"{prefix}Tensors are not close!\n{report}")

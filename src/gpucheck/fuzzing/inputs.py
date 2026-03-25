@@ -126,9 +126,17 @@ def edge_inputs(
     Edge cases generated:
       - zeros, ones, negative ones
       - max / min representable values
+      - negative zero, smallest normal, epsilon-scale values
       - NaN, Inf, -Inf (sprinkled at random positions)
       - Denormals (for fp16 / bf16)
       - Near-overflow values
+
+    .. note::
+        This function generates contiguous tensors only. Non-contiguous views
+        (e.g. slices, transposes, expand) are a major source of GPU kernel bugs
+        but cannot be expressed through shape + value alone. Consider testing
+        with ``tensor.T``, ``tensor[::2]``, or ``tensor.as_strided(...)``
+        separately to cover stride/contiguity edge cases.
     """
     torch = _torch_mod()
     results: list[tuple[str, Any]] = []
@@ -153,6 +161,13 @@ def edge_inputs(
         _make(fmin, "min_val")
         _make(fmax * 0.99, "near_overflow")
         _make(fmin * 0.99, "near_neg_overflow")
+        _make(-0.0, "neg_zero")
+        _make(tiny, "smallest_normal")
+
+        # Epsilon-scale: 1.0 + eps != 1.0, but 1.0 + eps/2 == 1.0
+        eps = float(torch.finfo(dtype).eps)
+        _make(eps, "epsilon")
+        _make(1.0 + eps, "one_plus_eps")
 
         # NaN / Inf — sprinkle into a normal tensor.
         for special_val, label in [

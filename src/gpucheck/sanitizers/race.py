@@ -88,7 +88,12 @@ def _parse_sanitizer_output(raw: str, tool: SanitizerTool) -> tuple[list[Sanitiz
 
 
 def _build_wrapper_script(fn: Callable[..., Any]) -> str:
-    """Generate a temporary Python script that imports and calls *fn*."""
+    """Generate a temporary Python script that imports and calls *fn*.
+
+    Validates that the module and function names are valid Python identifiers
+    to prevent code injection through crafted ``__name__`` / ``__module__``
+    attributes.
+    """
     module = inspect.getmodule(fn)
     if module is None or module.__name__ == "__main__":
         raise ValueError(
@@ -96,10 +101,19 @@ def _build_wrapper_script(fn: Callable[..., Any]) -> str:
             f"got {fn!r} from __main__"
         )
 
+    mod_name = module.__name__
+    fn_name = fn.__name__
+
+    # Validate names are safe Python identifiers (dotted for module)
+    if not all(part.isidentifier() for part in mod_name.split(".")):
+        raise ValueError(f"Invalid module name for sanitizer script: {mod_name!r}")
+    if not fn_name.isidentifier():
+        raise ValueError(f"Invalid function name for sanitizer script: {fn_name!r}")
+
     return (
         f"import sys; sys.path[:0] = {sys.path!r}\n"
-        f"from {module.__name__} import {fn.__name__}\n"
-        f"{fn.__name__}()\n"
+        f"from {mod_name} import {fn_name}\n"
+        f"{fn_name}()\n"
     )
 
 

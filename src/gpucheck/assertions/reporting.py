@@ -20,11 +20,17 @@ def format_mismatch_report(
     expected: npt.NDArray[Any],
     atol: float,
     rtol: float,
+    *,
+    actual_f64: npt.NDArray[Any] | None = None,
+    expected_f64: npt.NDArray[Any] | None = None,
 ) -> str:
     """Build a Rich-formatted mismatch report between two numpy arrays.
 
     Returns a plain string containing Rich markup that can be printed with
     ``rich.print()`` or ``rich.console.Console().print()``.
+
+    Pre-computed float64 arrays can be passed via *actual_f64* / *expected_f64*
+    to avoid redundant copies when the caller already has them.
     """
     np = _safe_import_numpy()
     from rich.console import Console
@@ -32,15 +38,20 @@ def format_mismatch_report(
     from rich.table import Table
     from rich.text import Text
 
-    diff = np.abs(actual.astype(np.float64) - expected.astype(np.float64))
-    expected_f64 = np.abs(expected.astype(np.float64))
+    if actual_f64 is None:
+        actual_f64 = actual.astype(np.float64, copy=False)
+    if expected_f64 is None:
+        expected_f64 = expected.astype(np.float64, copy=False)
+
+    diff = np.abs(actual_f64 - expected_f64)
+    abs_expected_f64 = np.abs(expected_f64)
 
     # Relative error: avoid division by zero.
     with np.errstate(divide="ignore", invalid="ignore"):
-        rel_err = np.where(expected_f64 != 0, diff / expected_f64, np.where(diff == 0, 0.0, np.inf))
+        rel_err = np.where(abs_expected_f64 != 0, diff / abs_expected_f64, np.where(diff == 0, 0.0, np.inf))
 
     # Mismatch mask: |a - b| > atol + rtol * |b|
-    threshold = atol + rtol * expected_f64
+    threshold = atol + rtol * abs_expected_f64
     mismatch_mask = diff > threshold
 
     total = actual.size
@@ -54,11 +65,11 @@ def format_mismatch_report(
     # Location of max absolute error.
     max_idx = np.unravel_index(int(np.nanargmax(diff)), diff.shape) if diff.size > 0 else ()
 
-    # NaN / Inf stats.
-    nan_actual = int(np.sum(np.isnan(actual.astype(np.float64))))
-    nan_expected = int(np.sum(np.isnan(expected.astype(np.float64))))
-    inf_actual = int(np.sum(np.isinf(actual.astype(np.float64))))
-    inf_expected = int(np.sum(np.isinf(expected.astype(np.float64))))
+    # NaN / Inf stats — reuse pre-computed f64 arrays.
+    nan_actual = int(np.sum(np.isnan(actual_f64)))
+    nan_expected = int(np.sum(np.isnan(expected_f64)))
+    inf_actual = int(np.sum(np.isinf(actual_f64)))
+    inf_expected = int(np.sum(np.isinf(expected_f64)))
 
     # --- Build Rich output ---
     stats_table = Table(title="Error Statistics", show_header=True, header_style="bold cyan")
