@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from typing import Any
 from unittest.mock import patch
 
@@ -109,8 +110,10 @@ class TestDevicesDecoratorParametrizes:
 
     def test_unavailable_device_gets_skip_mark(self) -> None:
         """Devices not available should get pytest.mark.skip."""
-        with patch(
-            "gpucheck.decorators.devices._is_device_available",
+        _mod = sys.modules["gpucheck.decorators.devices"]
+        with patch.object(
+            _mod,
+            "_is_device_available",
             side_effect=lambda d: d == "cpu",
         ):
             decorator = devices("cuda:0", "cpu")

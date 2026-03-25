@@ -141,7 +141,7 @@ def dtypes(*dtype_args: DtypeArg) -> Callable[..., Any]:
 
     return pytest.mark.parametrize(
         "dtype",
-        [pytest.param(d, id=i) for d, i in zip(raw, ids)],
+        [pytest.param(d, id=i) for d, i in zip(raw, ids, strict=True)],
     )
 
 
