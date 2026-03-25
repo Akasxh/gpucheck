@@ -70,18 +70,18 @@ class TestAssertCloseDtypeAwareDefaults:
 
     def test_float32_defaults(self) -> None:
         atol, rtol = compute_tolerance("float32")
-        assert atol == pytest.approx(1e-5)
-        assert rtol == pytest.approx(1.3e-6)
+        assert atol == pytest.approx(1e-4)
+        assert rtol == pytest.approx(1e-4)
 
     def test_float16_defaults(self) -> None:
         atol, rtol = compute_tolerance("float16")
-        assert atol == pytest.approx(1e-3)
-        assert rtol == pytest.approx(1e-3)
+        assert atol == pytest.approx(1e-2)
+        assert rtol == pytest.approx(1e-2)
 
     def test_bfloat16_defaults(self) -> None:
         atol, rtol = compute_tolerance("bfloat16")
-        assert atol == pytest.approx(1.6e-2)
-        assert rtol == pytest.approx(1.6e-2)
+        assert atol == pytest.approx(5e-2)
+        assert rtol == pytest.approx(5e-2)
 
     def test_unknown_dtype_falls_back_to_float32(self) -> None:
         atol, rtol = compute_tolerance("weird_dtype_xyz")

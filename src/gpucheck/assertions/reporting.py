@@ -68,7 +68,7 @@ def format_mismatch_report(
     if all_nan or diff.size == 0:
         max_idx: tuple[int, ...] = ()
     else:
-        max_idx = np.unravel_index(int(np.nanargmax(diff)), diff.shape)
+        max_idx = tuple(int(i) for i in np.unravel_index(int(np.nanargmax(diff)), diff.shape))
 
     # NaN / Inf stats — reuse pre-computed f64 arrays.
     nan_actual = int(np.sum(np.isnan(actual_f64)))

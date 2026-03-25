@@ -122,7 +122,7 @@ See the [examples/](examples/) directory for more complete examples.
 ```python
 from gpucheck import assert_close
 
-# Tolerances auto-selected: float16 gets atol=1e-3, rtol=1e-3
+# Tolerances auto-selected: float16 gets atol=1e-2, rtol=1e-2
 assert_close(result_fp16, expected_fp16)
 
 # Override for matmul-like ops: atol scales by sqrt(k_dim)
@@ -286,14 +286,14 @@ Default tolerances used by `assert_close` when no explicit `atol`/`rtol` is prov
 | dtype | atol | rtol |
 |---|---|---|
 | `float64` | `1e-10` | `1e-7` |
-| `float32` | `1e-5` | `1.3e-6` |
-| `tf32` | `1e-4` | `1e-4` |
-| `float16` | `1e-3` | `1e-3` |
-| `bfloat16` | `1.6e-2` | `1.6e-2` |
+| `float32` | `1e-4` | `1e-4` |
+| `tf32` | `5e-4` | `5e-4` |
+| `float16` | `1e-2` | `1e-2` |
+| `bfloat16` | `5e-2` | `5e-2` |
 | `float8_e4m3fn` | `0.125` | `0.125` |
 | `float8_e5m2` | `0.25` | `0.25` |
 
-For matmul-like operations, pass `k_dim` to scale `atol` by `sqrt(k_dim)`. Override per-project in `pyproject.toml`:
+For matmul-like operations, pass `k_dim` to scale `atol` by `sqrt(k_dim / 128)`. Override per-project in `pyproject.toml`:
 
 ```toml
 [tool.gpucheck.tolerances]

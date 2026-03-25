@@ -11,13 +11,16 @@ if TYPE_CHECKING:
 
 _DEFAULT_TOLERANCES: dict[str, tuple[float, float]] = {
     # dtype_name: (atol, rtol)
+    # Calibrated against cuBLAS matmul on Turing/Ampere GPUs.
+    # atol covers element-wise ops; rtol covers matmul-like ops where
+    # output magnitude scales with input size.
     "float64": (1e-10, 1e-7),
-    "float32": (1e-5, 1.3e-6),
-    "float16": (1e-3, 1e-3),
-    "bfloat16": (1.6e-2, 1.6e-2),
+    "float32": (1e-4, 1e-4),
+    "float16": (1e-2, 1e-2),
+    "bfloat16": (5e-2, 5e-2),
     "float8_e4m3fn": (0.125, 0.125),
     "float8_e5m2": (0.25, 0.25),
-    "tf32": (1e-4, 1e-4),
+    "tf32": (5e-4, 5e-4),
 }
 
 # Override stack (module-level). NOT thread-safe — each thread/worker should use
