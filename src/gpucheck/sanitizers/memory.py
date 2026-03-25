@@ -9,7 +9,7 @@ from typing import Any, Callable, Generator
 
 
 @dataclass(frozen=True, slots=True)
-class MemoryReport:
+class SanitizerMemoryReport:
     """Result of a memory leak check."""
 
     leaked_bytes: int
@@ -80,7 +80,7 @@ def check_memory_leaks(
     fn: Callable[..., Any],
     *args: Any,
     **kwargs: Any,
-) -> MemoryReport:
+) -> SanitizerMemoryReport:
     """Run *fn* and report GPU memory allocations and leaks.
 
     Uses torch.cuda.memory_stats when available, falls back to pynvml.
@@ -113,7 +113,7 @@ def check_memory_leaks(
         alloc_after = stats_after.get("allocation.all.current", 0)
         free_count = stats_after.get("free.all.current", 0)
 
-        return MemoryReport(
+        return SanitizerMemoryReport(
             leaked_bytes=max(0, after - before),
             peak_bytes=peak,
             allocations=max(0, alloc_after - alloc_before),
@@ -126,7 +126,7 @@ def check_memory_leaks(
     _sync_and_gc()
     after_bytes = _get_pynvml_memory()
 
-    return MemoryReport(
+    return SanitizerMemoryReport(
         leaked_bytes=max(0, after_bytes - before_bytes),
         peak_bytes=max(before_bytes, after_bytes),
         allocations=0,
@@ -135,8 +135,8 @@ def check_memory_leaks(
 
 
 @contextmanager
-def memory_guard(threshold_bytes: int = 0) -> Generator[MemoryReport, None, None]:
-    """Context manager that tracks GPU memory and yields a :class:`MemoryReport`.
+def memory_guard(threshold_bytes: int = 0) -> Generator[_MutableReport, None, None]:
+    """Context manager that tracks GPU memory and yields a :class:`SanitizerMemoryReport`.
 
     Usage::
 
@@ -158,8 +158,8 @@ def memory_guard(threshold_bytes: int = 0) -> Generator[MemoryReport, None, None
         pass
 
     # We build the report as a mutable list, then replace the sentinel.
-    # Since MemoryReport is frozen we need this indirection.
-    report = MemoryReport(leaked_bytes=0, peak_bytes=0, allocations=0, deallocations=0)
+    # Since SanitizerMemoryReport is frozen we need this indirection.
+    report = SanitizerMemoryReport(leaked_bytes=0, peak_bytes=0, allocations=0, deallocations=0)
     # Use object.__new__ trick to yield the same reference, then mutate via
     # __dict__ bypass — or just use a mutable wrapper.
     _holder: dict[str, Any] = {}
@@ -214,7 +214,7 @@ def memory_guard(threshold_bytes: int = 0) -> Generator[MemoryReport, None, None
 
 
 class _MutableReport:
-    """Mutable stand-in for :class:`MemoryReport`, filled after context exit."""
+    """Mutable stand-in for :class:`SanitizerMemoryReport`, filled after context exit."""
 
     __slots__ = ("leaked_bytes", "peak_bytes", "allocations", "deallocations")
 
@@ -249,8 +249,8 @@ class _MutableReport:
     def has_leak(self) -> bool:
         return self.leaked_bytes > 0
 
-    def to_report(self) -> MemoryReport:
-        return MemoryReport(
+    def to_report(self) -> SanitizerMemoryReport:
+        return SanitizerMemoryReport(
             leaked_bytes=self.leaked_bytes,
             peak_bytes=self.peak_bytes,
             allocations=self.allocations,

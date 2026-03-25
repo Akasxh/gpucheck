@@ -13,7 +13,7 @@ import json
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -302,14 +302,32 @@ def detect_regression(
 # ---------------------------------------------------------------------------
 
 
+def _collect_metadata() -> dict[str, str]:
+    """Gather environment metadata for baseline files."""
+    import time as _time
+
+    meta: dict[str, str] = {"timestamp": _time.strftime("%Y-%m-%dT%H:%M:%S%z")}
+    try:
+        import torch
+
+        meta["torch_version"] = torch.__version__
+        if torch.cuda.is_available():
+            meta["cuda_version"] = getattr(torch.version, "cuda", "") or ""
+            meta["gpu_name"] = torch.cuda.get_device_name(0)
+    except ImportError:
+        pass
+    return meta
+
+
 def save_baseline(path: str | Path, name: str, results: Sequence[float]) -> None:
     """Persist timing results as a JSON baseline.
 
     The file maps benchmark names → lists of timings; existing entries for
-    other benchmarks are preserved.
+    other benchmarks are preserved.  A ``_metadata`` key stores environment
+    info (GPU model, CUDA/torch versions, timestamp).
     """
     p = Path(path)
-    data: dict[str, list[float]] = {}
+    data: dict[str, Any] = {}
     if p.exists():
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
@@ -317,6 +335,8 @@ def save_baseline(path: str | Path, name: str, results: Sequence[float]) -> None
             data = {}
 
     data[name] = [float(v) for v in results]
+    data["_metadata"] = _collect_metadata()
+    data.setdefault("_schema_version", 1)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 

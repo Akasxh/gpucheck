@@ -23,6 +23,9 @@ def _to_numpy(tensor: Any) -> npt.NDArray[Any]:
         if t.is_floating_point():
             if t.dtype.itemsize >= 8:
                 return t.double().numpy()  # type: ignore[no-any-return]
+            if t.dtype.itemsize >= 4:
+                return t.numpy()  # type: ignore[no-any-return]
+            # Sub-float32 types (fp16, bf16, fp8) need upcast to float32
             return t.float().numpy()  # type: ignore[no-any-return]
         return t.numpy()  # type: ignore[no-any-return]
 
@@ -46,6 +49,8 @@ def _to_numpy(tensor: Any) -> npt.NDArray[Any]:
             if t.is_floating_point():
                 if t.dtype.itemsize >= 8:
                     return t.double().numpy()  # type: ignore[no-any-return]
+                if t.dtype.itemsize >= 4:
+                    return t.numpy()  # type: ignore[no-any-return]
                 return t.float().numpy()  # type: ignore[no-any-return]
             return t.numpy()  # type: ignore[no-any-return]
         except (ImportError, RuntimeError):

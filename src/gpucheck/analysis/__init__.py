@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from gpucheck.analysis.bottleneck import BottleneckAnalysis
-from gpucheck.analysis.bottleneck import classify_bottleneck as classify_bottleneck_auto
+from gpucheck.analysis.bottleneck import BottleneckAnalysis, auto_classify_bottleneck
 from gpucheck.analysis.regression import (
     RegressionReport,
     RegressionResult,

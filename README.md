@@ -11,8 +11,10 @@ GPU kernel testing is painful. You write a CUDA kernel, eyeball `torch.allclose`
 
 ```python
 import torch
+import pytest
 from gpucheck import assert_close, dtypes, shapes, devices
 
+@pytest.mark.gpu
 @dtypes("float16", "bfloat16", "float32")
 @shapes((128, 128), (512, 512), (1024, 1024))
 @devices("cuda:0")

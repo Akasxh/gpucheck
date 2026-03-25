@@ -73,6 +73,7 @@ class JSONReporter:
         out_path = self._output_dir / "results.json"
 
         payload: dict[str, Any] = {
+            "schema_version": 1,
             "timestamp": self._record.timestamp,
             "gpu_info": self._record.gpu_info,
             "test_results": self._record.test_results,

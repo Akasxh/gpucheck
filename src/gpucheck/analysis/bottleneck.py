@@ -105,7 +105,7 @@ def _fit_log_log_slope(xs: list[float], ys: list[float]) -> float:
 # ---------------------------------------------------------------------------
 
 
-def classify_bottleneck(
+def auto_classify_bottleneck(
     benchmark_fn: Callable[..., Any],
     input_sizes: list[int] | None = None,
     *,

@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import functools
-from typing import Any, Callable, Union
+from typing import Any, Callable, Iterator, Union
 
 import pytest
 
@@ -77,7 +76,7 @@ class _DtypeGroup:
         self._names = names
         self._resolved: tuple[Any, ...] | None = None
 
-    def __iter__(self):  # noqa: ANN204
+    def __iter__(self) -> Iterator[Any]:
         if self._resolved is None:
             self._resolved = _lazy_group(self._names)
         return iter(self._resolved)
@@ -105,6 +104,11 @@ def dtypes(*dtype_args: DtypeArg) -> Callable[..., Any]:
     Accepts strings ("float16", "bfloat16"), torch.dtype objects, or
     predefined groups (FLOAT_DTYPES, HALF_DTYPES, etc.).
 
+    Dtype resolution is deferred to test collection time: strings are stored
+    as-is during decoration and resolved to ``torch.dtype`` only when pytest
+    actually collects the test (via ``pytest.param`` indirect). This avoids
+    triggering ``import torch`` at module import time.
+
     Examples::
 
         @dtypes("float16", "float32")
@@ -113,6 +117,7 @@ def dtypes(*dtype_args: DtypeArg) -> Callable[..., Any]:
         @dtypes(*FLOAT_DTYPES)
         def test_matmul(dtype): ...
     """
+    # Build lazy params — resolution deferred to collection time
     resolved: list[Any] = []
     for arg in dtype_args:
         resolved.append(_resolve_dtype(arg))
