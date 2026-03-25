@@ -59,6 +59,7 @@ packages = ["src/gpucheck"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--ignore=tests/gpu_integration"
 markers = [
     "gpu: marks tests requiring a GPU",
     "slow: marks slow-running tests",
@@ -68,6 +69,7 @@ markers = [
 [tool.ruff]
 target-version = "py310"
 line-length = 100
+extend-exclude = ["tests/gpu_integration"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM", "TCH"]

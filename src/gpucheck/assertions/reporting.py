@@ -58,13 +58,17 @@ def format_mismatch_report(
     mismatch_count = int(np.sum(mismatch_mask))
     mismatch_pct = 100.0 * mismatch_count / total if total > 0 else 0.0
 
-    max_abs_err = float(np.nanmax(diff)) if diff.size > 0 else 0.0
-    mean_abs_err = float(np.nanmean(diff)) if diff.size > 0 else 0.0
+    all_nan = diff.size == 0 or np.all(np.isnan(diff))
+    max_abs_err = float("nan") if all_nan else float(np.nanmax(diff))
+    mean_abs_err = float("nan") if all_nan else float(np.nanmean(diff))
     finite_rel = rel_err[np.isfinite(rel_err)]
     max_rel_err = float(np.nanmax(finite_rel)) if finite_rel.size > 0 else float("inf")
 
     # Location of max absolute error.
-    max_idx = np.unravel_index(int(np.nanargmax(diff)), diff.shape) if diff.size > 0 else ()
+    if all_nan or diff.size == 0:
+        max_idx: tuple[int, ...] = ()
+    else:
+        max_idx = np.unravel_index(int(np.nanargmax(diff)), diff.shape)
 
     # NaN / Inf stats — reuse pre-computed f64 arrays.
     nan_actual = int(np.sum(np.isnan(actual_f64)))
