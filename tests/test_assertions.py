@@ -171,7 +171,8 @@ class TestComputeToleranceWithKScaling:
         base_atol, base_rtol = compute_tolerance("float32")
         k = 256
         atol, rtol = compute_tolerance("float32", k_dim=k)
-        assert atol == pytest.approx(base_atol * math.sqrt(k))
+        # Scaling is sqrt(k / 128) per CUTLASS error model
+        assert atol == pytest.approx(base_atol * math.sqrt(k / 128.0))
         assert rtol == base_rtol  # rtol unchanged
 
     def test_k_dim_zero_no_scaling(self) -> None:

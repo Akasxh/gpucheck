@@ -33,7 +33,7 @@ class MemoryReport:
     after: MemorySnapshot
     peak: int  # bytes — peak memory usage during the test
     leaked: int  # bytes — memory not freed after the test
-    leak_detected: bool
+    has_leak: bool
 
     @property
     def peak_mb(self) -> float:
@@ -44,7 +44,7 @@ class MemoryReport:
         return self.leaked / (1024 * 1024)
 
     def __str__(self) -> str:
-        status = "LEAK" if self.leak_detected else "OK"
+        status = "LEAK" if self.has_leak else "OK"
         return (
             f"MemoryReport({status}: before={self.before.used_mb:.1f}MB, "
             f"after={self.after.used_mb:.1f}MB, peak={self.peak_mb:.1f}MB, "
@@ -155,7 +155,7 @@ class MemoryTracker:
             )
             zero = MemorySnapshot(used=0, free=0, total=0)
             self._report = MemoryReport(
-                before=zero, after=zero, peak=0, leaked=0, leak_detected=False
+                before=zero, after=zero, peak=0, leaked=0, has_leak=False
             )
             return self._report
 
@@ -167,7 +167,7 @@ class MemoryTracker:
             after=self._after,
             peak=peak,
             leaked=leaked,
-            leak_detected=leaked > self.leak_threshold,
+            has_leak=leaked > self.leak_threshold,
         )
         return self._report
 
@@ -195,7 +195,7 @@ def memory_tracker() -> Generator[MemoryTracker, None, None]:
             del x
             torch.cuda.empty_cache()
             report = memory_tracker.stop()
-            assert not report.leak_detected
+            assert not report.has_leak
     """
     tracker = _MemoryTracker()
     tracker.start()
@@ -203,7 +203,7 @@ def memory_tracker() -> Generator[MemoryTracker, None, None]:
     # If user already called stop(), don't overwrite
     if tracker.report is None:
         report = tracker.stop()
-        if report.leak_detected:
+        if report.has_leak:
             warnings.warn(
                 f"GPU memory leak detected: {report.leaked_mb:.1f}MB not freed",
                 RuntimeWarning,

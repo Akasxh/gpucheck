@@ -43,8 +43,9 @@ def compute_tolerance(
     """Return (atol, rtol) for a given dtype.
 
     If *k_dim* is supplied (reduction / matmul inner dimension), atol is
-    scaled by ``sqrt(k_dim)`` following the standard error-accumulation
-    model for floating-point summation.
+    scaled by ``sqrt(k_dim / 128)`` following the CUTLASS error-accumulation
+    model where 128 is the standard tile dimension. This means at k_dim=128
+    the tolerance is 1x the base, and scales proportionally from there.
 
     Falls back to float32 tolerances for unknown dtypes.
     """
@@ -60,7 +61,7 @@ def compute_tolerance(
         atol, rtol = _DEFAULT_TOLERANCES.get(name, _DEFAULT_TOLERANCES["float32"])
 
     if k_dim is not None and k_dim > 0:
-        atol = atol * math.sqrt(k_dim)
+        atol = atol * math.sqrt(max(k_dim, 1) / 128.0)
 
     return atol, rtol
 

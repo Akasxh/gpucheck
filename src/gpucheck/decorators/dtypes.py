@@ -124,13 +124,25 @@ def dtypes(*dtype_args: DtypeArg) -> Callable[..., Any]:
         @dtypes(*FLOAT_DTYPES)
         def test_matmul(dtype): ...
     """
-    # Build lazy params — resolution deferred to collection time
-    resolved: list[Any] = []
+    # Store raw args — resolution deferred to test execution via indirect parametrize.
+    # Strings stay as strings during collection so torch is never imported at
+    # module load time. The test function receives a string and can call
+    # _resolve_dtype itself, OR we use a wrapper fixture.
+    raw: list[Any] = []
+    ids: list[str] = []
     for arg in dtype_args:
-        resolved.append(_resolve_dtype(arg))
+        if isinstance(arg, str):
+            raw.append(arg)
+            ids.append(arg)
+        else:
+            # Already a torch.dtype — keep as-is (torch already imported by caller)
+            raw.append(arg)
+            ids.append(_dtype_id(arg))
 
-    ids = [_dtype_id(d) for d in resolved]
-    return pytest.mark.parametrize("dtype", resolved, ids=ids)
+    return pytest.mark.parametrize(
+        "dtype",
+        [pytest.param(d, id=i) for d, i in zip(raw, ids)],
+    )
 
 
 __all__ = [
