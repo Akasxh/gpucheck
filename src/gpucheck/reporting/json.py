@@ -92,6 +92,7 @@ class JSONReporter:
     def compare_runs(
         baseline_path: str | Path,
         current_path: str | Path,
+        regression_threshold: float = 0.05,
     ) -> dict[str, Any]:
         """Compare two JSON result files and return a diff summary.
 
@@ -119,7 +120,7 @@ class JSONReporter:
                 entry["delta_pct"] = (
                     ((curr_med - base_med) / base_med * 100) if base_med > 0 else 0.0
                 )
-                entry["status"] = "regression" if curr_med > base_med * 1.05 else "ok"
+                entry["status"] = "regression" if curr_med > base_med * (1.0 + regression_threshold) else "ok"
             elif curr:
                 entry["status"] = "new"
                 entry["current_median_ms"] = curr["median_ms"]

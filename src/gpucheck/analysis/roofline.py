@@ -181,48 +181,19 @@ def classify_bottleneck(point: RooflinePoint, tolerance: float = 0.10) -> Bottle
             return "compute_bound"
         return "balanced"
 
-    # Reconstruct ridge from the ceilings embedded in the point.
-    # peak_throughput (GFLOP/s) == min(peak_compute, AI × peak_bw) / 1e9
-    # We can't directly recover peak_compute and peak_bw from a single
-    # point, so use a practical check: if ceiling == AI × bw (memory line),
-    # the point sits on the memory slope; otherwise on the compute flat.
-    #
-    # Equivalent: compare achieved_throughput / peak_throughput with
-    # bandwidth utilisation, but the simplest robust heuristic is:
-    # the roofline ceiling equals the *minimum* of two lines.  If the
-    # memory line is the active constraint, raising AI would increase
-    # ceiling.  We test by checking if peak_throughput ≈ AI * (something).
-    # Without explicit specs, compare efficiency directly:
+    # If peak_bandwidth is available, compute the ridge point and use tolerance
+    if point.peak_bandwidth > 0 and point.peak_throughput > 0:
+        peak_flops_s = point.peak_throughput * 1e9  # convert GFLOP/s to FLOP/s
+        ridge = peak_flops_s / point.peak_bandwidth  # FLOP/byte
+        lo = ridge * (1.0 - tolerance)
+        hi = ridge * (1.0 + tolerance)
+        if ai < lo:
+            return "memory_bound"
+        if ai > hi:
+            return "compute_bound"
+        return "balanced"
 
-    # If the point was built with specs we can recover them:
-    if point.achieved_bandwidth > 0 and point.achieved_flops > 0:
-        # Attempt to infer specs from the point's ceiling.
-        # peak_gflops = peak_throughput.  If memory-bound, peak = AI * bw_peak / 1e9.
-        # We don't have bw_peak directly, but we know achieved_bw.
-        # Better: just use AI vs a nominal ridge.
-        pass
-
-    # Fallback: use ratio of AI to a "virtual ridge" derived from the
-    # ceiling slope.  At the ridge, peak_compute/1e9 == AI_ridge * bw_peak/1e9.
-    # peak_throughput at this AI is either on the memory slope or the flat.
-    # If peak_throughput grows linearly with AI (for a hypothetical nearby
-    # AI), we're on the memory slope.  With one point we simply test
-    # whether the efficiency is dominated by memory or compute.
-
-    # Practical: check if peak_throughput * 1e9 ≈ AI * achieved_bandwidth
-    # (memory ceiling active) or not.
-    if point.achieved_bandwidth > 0:
-        inferred_memory_ceiling_gflops = ai * point.achieved_bandwidth / 1e9
-        # If the roofline ceiling roughly equals the memory ceiling, memory-bound.
-        ratio = inferred_memory_ceiling_gflops / point.peak_throughput if point.peak_throughput > 0 else 0.0
-        # ratio ~ efficiency means memory slope is close to active ceiling.
-        # For a cleaner signal, just check: is peak == memory_ceil?
-        # We can't know peak_compute separately.  Use AI threshold.
-        pass
-
-    # Robust single-point rule: use AI thresholds calibrated to typical GPUs.
-    # Ridge for A100 ≈ 9.6, H100 ≈ 15.3, V100 ≈ 17.4, 4090 ≈ 81.9.
-    # A generic threshold of ~10 FLOP/byte is reasonable for HBM GPUs.
+    # Fallback: use AI thresholds calibrated to typical GPUs.
     if ai < 4.0:
         return "memory_bound"
     if ai > 20.0:

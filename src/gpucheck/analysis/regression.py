@@ -58,28 +58,27 @@ def mann_whitney_u(
     if n1 == 0 or n2 == 0:
         return 0.0, 1.0
 
-    # Combine and rank
-    combined: list[tuple[float, int]] = []
-    for v in baseline:
-        combined.append((v, 0))
-    for v in current:
-        combined.append((v, 1))
-    combined.sort(key=lambda x: x[0])
+    # Combine and rank (vectorized with numpy)
+    values = np.concatenate([np.asarray(baseline, dtype=np.float64),
+                             np.asarray(current, dtype=np.float64)])
+    groups = np.concatenate([np.zeros(n1, dtype=np.int32),
+                             np.ones(n2, dtype=np.int32)])
+    order = np.argsort(values, kind="mergesort")
+    sorted_values = values[order]
+    sorted_groups = groups[order]
 
-    ranks = [0.0] * len(combined)
-    tie_counts: list[int] = []
-    i = 0
-    while i < len(combined):
-        j = i
-        while j < len(combined) and combined[j][0] == combined[i][0]:
-            j += 1
-        avg_rank = (i + j + 1) / 2.0  # 1-based
-        tie_counts.append(j - i)
-        for k in range(i, j):
-            ranks[k] = avg_rank
-        i = j
+    # Compute ranks with tie correction
+    n_total = n1 + n2
+    ranks = np.empty(n_total, dtype=np.float64)
+    unique_vals, unique_indices, unique_counts = np.unique(
+        sorted_values, return_index=True, return_counts=True
+    )
+    tie_counts_list: list[int] = unique_counts.tolist()
+    for idx, count in zip(unique_indices, unique_counts):
+        avg_rank = (2 * idx + count + 1) / 2.0  # 1-based average rank
+        ranks[idx:idx + count] = avg_rank
 
-    r1 = sum(ranks[i] for i in range(len(combined)) if combined[i][1] == 0)
+    r1 = float(np.sum(ranks[sorted_groups == 0]))
     u1 = r1 - n1 * (n1 + 1) / 2.0
     u2 = n1 * n2 - u1
     u = min(u1, u2)
@@ -88,7 +87,7 @@ def mann_whitney_u(
     n = n1 + n2
 
     # Tie correction: Σ(t³ - t) / (n(n-1))
-    tie_term = sum(t**3 - t for t in tie_counts) / (n * (n - 1)) if n > 1 else 0.0
+    tie_term = float(np.sum(unique_counts**3 - unique_counts)) / (n * (n - 1)) if n > 1 else 0.0
     sigma_sq = (n1 * n2 / 12.0) * (n + 1 - tie_term)
     if sigma_sq <= 0:
         return u, 1.0

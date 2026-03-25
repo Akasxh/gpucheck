@@ -99,14 +99,25 @@ def assert_close(
         Optional extra message prepended to failure output.
     """
     dtype = _resolve_dtype(actual, expected)
-    default_atol, default_rtol = compute_tolerance(dtype, k_dim=k_dim)
 
-    eff_atol = atol if atol is not None else default_atol
-    eff_rtol = rtol if rtol is not None else default_rtol
+    if baseline_2x and atol is None and rtol is None:
+        # FlashAttention 2x: double base tolerance BEFORE k_dim scaling
+        base_atol, base_rtol = compute_tolerance(dtype)
+        doubled_atol, doubled_rtol = base_atol * 2.0, base_rtol * 2.0
+        # Now apply k_dim scaling on the doubled base
+        if k_dim is not None and k_dim > 0:
+            import math
 
-    if baseline_2x:
-        eff_atol *= 2.0
-        eff_rtol *= 2.0
+            doubled_atol *= math.sqrt(k_dim)
+        eff_atol = atol if atol is not None else doubled_atol
+        eff_rtol = rtol if rtol is not None else doubled_rtol
+    else:
+        default_atol, default_rtol = compute_tolerance(dtype, k_dim=k_dim)
+        eff_atol = atol if atol is not None else default_atol
+        eff_rtol = rtol if rtol is not None else default_rtol
+        if baseline_2x:
+            eff_atol *= 2.0
+            eff_rtol *= 2.0
 
     actual_np = _to_numpy(actual)
     expected_np = _to_numpy(expected)
@@ -196,4 +207,8 @@ def assert_close(
                 actual_f64=actual_f64, expected_f64=expected_f64,
             )
         prefix = f"{msg}\n" if msg else ""
-        raise AssertionError(f"{prefix}Tensors are not close!\n{report}")
+        raise AssertionError(
+            f"{prefix}Tensors are not close! "
+            f"(atol={eff_atol:.2e}, rtol={eff_rtol:.2e}; "
+            f"override with atol=/rtol= or use k_dim=/baseline_2x=)\n{report}"
+        )

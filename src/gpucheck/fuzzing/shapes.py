@@ -127,6 +127,11 @@ def fuzz_shapes(
     seed:
         Optional RNG seed for reproducibility.
     """
+    if min_size > max_size:
+        raise ValueError(f"min_size ({min_size}) must be <= max_size ({max_size})")
+    if ndim < 0:
+        raise ValueError(f"ndim must be >= 0, got {ndim}")
+
     pool: list[tuple[int, ...]] = []
 
     pool.extend(_degenerate_shapes(ndim))

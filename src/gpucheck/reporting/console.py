@@ -20,6 +20,8 @@ class TestResult:
     status: str  # "passed", "failed", "skipped", "error"
     duration: float = 0.0
     message: str = ""
+    file: str = ""
+    line: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,8 +67,18 @@ _STATUS_STYLE: dict[str, str] = {
 class ConsoleReporter:
     """Rich-powered terminal reporter for gpucheck sessions."""
 
-    def __init__(self, *, console: Console | None = None, verbose: bool = False) -> None:
-        self._console = console or Console()
+    def __init__(self, *, console: Console | None = None, verbose: bool = False, file: Any = None) -> None:
+        import os
+        import sys
+
+        if console is not None:
+            self._console = console
+        elif file is not None:
+            self._console = Console(file=file)
+        elif os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+            self._console = Console(file=sys.stderr)
+        else:
+            self._console = Console()
         self._verbose = verbose
 
     # ------------------------------------------------------------------

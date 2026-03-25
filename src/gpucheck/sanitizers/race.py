@@ -78,6 +78,10 @@ def _parse_sanitizer_output(raw: str, tool: SanitizerTool) -> tuple[list[Sanitiz
 
         lowered = content.lower()
 
+        # Skip summary lines to avoid double-counting
+        if "summary:" in lowered:
+            continue
+
         if "error" in lowered and "0 errors" not in lowered:
             # Try to extract structured info
             errors.append(SanitizerError(description=content))
@@ -142,6 +146,8 @@ def run_with_sanitizer(
     """
     if tool not in _VALID_TOOLS:
         raise ValueError(f"Invalid tool {tool!r}, must be one of {sorted(_VALID_TOOLS)}")
+    if timeout <= 0:
+        raise ValueError(f"timeout must be positive, got {timeout}")
 
     sanitizer_bin = _find_compute_sanitizer()
     if sanitizer_bin is None:
@@ -162,6 +168,8 @@ def run_with_sanitizer(
             tool,
             "--print-level",
             "warn",
+            "--error-exitcode",
+            "1",
         ]
         if extra_args:
             cmd.extend(extra_args)

@@ -54,6 +54,15 @@ _LEAK_THRESHOLD_BYTES = 1 * 1024 * 1024
 
 
 def _snapshot_pynvml(device_id: int = 0) -> MemorySnapshot | None:
+    # Synchronize GPU before taking pynvml snapshot to ensure pending ops complete
+    try:
+        import torch  # type: ignore[import-untyped]
+
+        if torch.cuda.is_available():
+            torch.cuda.synchronize(device_id)
+    except (ImportError, RuntimeError):
+        pass
+
     try:
         import pynvml  # type: ignore[import-untyped]
     except ImportError:
@@ -116,7 +125,7 @@ def _reset_peak_torch(device_id: int = 0) -> None:
         pass
 
 
-class _MemoryTracker:
+class MemoryTracker:
     """Tracks GPU memory across a test's lifetime."""
 
     def __init__(self, device_id: int = 0, leak_threshold: int = _LEAK_THRESHOLD_BYTES) -> None:
@@ -164,8 +173,12 @@ class _MemoryTracker:
         return self._report
 
 
+# Backward-compat alias
+_MemoryTracker = MemoryTracker
+
+
 @pytest.fixture()
-def memory_tracker() -> Generator[_MemoryTracker, None, None]:
+def memory_tracker() -> Generator[MemoryTracker, None, None]:
     """Track GPU memory usage and detect leaks during a test.
 
     The tracker automatically records memory before the test body runs.

@@ -83,7 +83,7 @@ def _tensor_core_gen(cc: tuple[int, int]) -> int | None:
     return None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class GPUInfo:
     """Detailed information about a single GPU device."""
 

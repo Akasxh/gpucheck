@@ -160,6 +160,10 @@ def _arch_adjust(
         atol *= 0.8
         rtol *= 0.8
 
+    # Tensor cores flush denormals to zero; widen atol for sub-normal ranges
+    if dtype_norm in ("float16", "fp16", "bfloat16", "bf16"):
+        atol = max(atol, 1e-7)  # floor at denormal boundary
+
     return (atol, rtol)
 
 

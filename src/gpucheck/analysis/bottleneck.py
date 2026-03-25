@@ -84,12 +84,13 @@ def _fit_log_log_slope(xs: list[float], ys: list[float]) -> float:
     if n < 2:
         return 0.0
 
-    lx = [math.log(x) for x in xs[:n] if x > 0]
-    ly = [math.log(y) for y in ys[:n] if y > 0]
-    n = min(len(lx), len(ly))
-    if n < 2:
+    # Filter pairs jointly to avoid misaligned arrays
+    pairs = [(math.log(x), math.log(y)) for x, y in zip(xs[:n], ys[:n]) if x > 0 and y > 0]
+    if len(pairs) < 2:
         return 0.0
-    lx, ly = lx[:n], ly[:n]
+    lx = [p[0] for p in pairs]
+    ly = [p[1] for p in pairs]
+    n = len(lx)
 
     mx = sum(lx) / n
     my = sum(ly) / n

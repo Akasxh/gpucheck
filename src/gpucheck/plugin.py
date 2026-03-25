@@ -120,13 +120,13 @@ def gpu_device() -> Any:
 def memory_tracker() -> Any:
     """Track GPU memory usage and detect leaks during a test."""
     try:
-        from gpucheck.fixtures.profiler import _MemoryTracker
+        from gpucheck.fixtures.profiler import MemoryTracker
     except ImportError:
         pytest.skip("memory_tracker requires pynvml or torch")
 
     import warnings
 
-    tracker = _MemoryTracker()
+    tracker = MemoryTracker()
     tracker.start()
     yield tracker
     if tracker.report is None:

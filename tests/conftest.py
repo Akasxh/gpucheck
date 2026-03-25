@@ -6,8 +6,7 @@ All tests run on CPU-only CI — GPU interactions are mocked.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Generator
-from unittest.mock import MagicMock, patch
+from typing import Any
 
 import numpy as np
 import pytest
@@ -56,13 +55,6 @@ def mock_gpu_hopper() -> MockGPUInfo:
         tensor_core_generation=4,
         max_shared_memory_per_block=228 * 1024,
     )
-
-
-@pytest.fixture()
-def mock_detect_gpus(mock_gpu: MockGPUInfo) -> Generator[MagicMock, None, None]:
-    """Patch detect_gpus() to return a list containing the mock GPU."""
-    with patch("gpucheck.arch.detection.detect_gpus", return_value=[mock_gpu]) as m:
-        yield m
 
 
 # ---------------------------------------------------------------------------

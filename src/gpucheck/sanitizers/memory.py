@@ -63,15 +63,16 @@ def _get_pynvml_memory() -> int:
         return 0
 
 
-def _sync_and_gc() -> None:
+def _sync_and_gc(device_id: int = 0) -> None:
     """Force GC and sync GPU."""
     gc.collect()
     try:
         import torch
 
         if torch.cuda.is_available():
-            torch.cuda.synchronize()
-            torch.cuda.empty_cache()
+            with torch.cuda.device(device_id):
+                torch.cuda.synchronize()
+                torch.cuda.empty_cache()
     except ImportError:
         pass
 

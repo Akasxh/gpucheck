@@ -89,17 +89,31 @@ def _get_l2_cache_size() -> int:
     return 40 * 1024 * 1024  # 40 MB default
 
 
-def _flush_l2_cache(l2_size: int) -> None:
+_torch_cache: Any = None
+
+
+def _get_torch() -> Any:
+    """Lazy-cached torch import for hot-loop use."""
+    global _torch_cache  # noqa: PLW0603
+    if _torch_cache is None:
+        import torch  # type: ignore[import-untyped]
+
+        _torch_cache = torch
+    return _torch_cache
+
+
+def _flush_l2_cache(l2_size: int, buf: Any = None) -> None:
     """Flush GPU L2 cache by writing a buffer the size of L2."""
     try:
-        import torch  # type: ignore[import-untyped]
+        torch = _get_torch()
 
         if not torch.cuda.is_available():
             return
-        # Allocate and write a throwaway buffer to evict L2 contents
-        buf = torch.empty(l2_size // 4, dtype=torch.float32, device="cuda")
+        # Use pre-allocated buffer if available, otherwise allocate
+        if buf is None:
+            buf = torch.empty(l2_size // 4, dtype=torch.float32, device="cuda")
         buf.fill_(0.0)
-        del buf
+        torch.cuda.synchronize()
     except ImportError:
         # Without torch we can't easily flush; this is best-effort
         pass
@@ -115,10 +129,20 @@ class _BenchmarkRunner:
     rounds: int = 100
     flush_l2: bool = True
     _l2_size: int = field(default=0, init=False, repr=False)
+    _flush_buf: Any = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.flush_l2:
             self._l2_size = _get_l2_cache_size()
+            # Pre-allocate flush buffer for reuse across iterations
+            try:
+                torch = _get_torch()
+                if torch.cuda.is_available() and self._l2_size > 0:
+                    self._flush_buf = torch.empty(
+                        self._l2_size // 4, dtype=torch.float32, device="cuda"
+                    )
+            except (ImportError, RuntimeError):
+                pass
 
     def __call__(
         self,
@@ -166,14 +190,15 @@ class _BenchmarkRunner:
             fn(*args, **kwargs)
         torch.cuda.synchronize()
 
+        # Pre-allocate CUDA events to avoid per-iteration allocation overhead
+        start = torch.cuda.Event(enable_timing=True)
+        end = torch.cuda.Event(enable_timing=True)
+
         # Timed runs
         raw_times: list[float] = []
         for _ in range(n_rounds):
             if do_flush and self._l2_size > 0:
-                _flush_l2_cache(self._l2_size)
-
-            start = torch.cuda.Event(enable_timing=True)
-            end = torch.cuda.Event(enable_timing=True)
+                _flush_l2_cache(self._l2_size, buf=self._flush_buf)
 
             start.record()  # type: ignore[no-untyped-call]
             fn(*args, **kwargs)

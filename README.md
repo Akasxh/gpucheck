@@ -59,12 +59,15 @@ graph LR
         D[Fixtures]
         E[Fuzzing]
         F[Sanitizers]
+        K[Analysis]
+        L[Reporting]
+        M[Arch]
     end
 
     subgraph pytest
         G[Collection]
         H[Execution]
-        I[Reporting]
+        I[Reporting Output]
     end
 
     subgraph GPU
@@ -78,10 +81,37 @@ graph LR
     B -->|"@dtypes @shapes @devices"| G
     D -->|"gpu_benchmark, memory_tracker"| H
     C -->|"assert_close + rich report"| I
-    F -->|"fuzz_shapes"| G
+    E -->|"fuzz_shapes"| G
+    F -.->|"memory_guard"| H
+    K -->|"roofline, regression"| L
+    M -->|"detect_gpus"| D
     H --> J
-    F -.->|"memory_guard"| F
+    L --> I
 ```
+
+## Quickstart
+
+```bash
+pip install gpucheck[torch]
+```
+
+```python
+# test_my_kernel.py
+import torch, pytest
+from gpucheck import assert_close, dtypes
+
+@pytest.mark.gpu
+@dtypes("float16", "float32")
+def test_relu(dtype):
+    x = torch.randn(256, 256, dtype=dtype, device="cuda")
+    assert_close(torch.relu(x), torch.clamp(x, min=0))
+```
+
+```bash
+pytest test_my_kernel.py -v
+```
+
+See the [examples/](examples/) directory for more complete examples.
 
 ## Features
 
