@@ -82,12 +82,6 @@ def pytest_terminal_summary(
         writer.line("  No GPU detected")
 
 
-# Deferred fixture imports — only loaded when pytest actually needs them.
-def _register_fixtures() -> None:
-    """Import fixtures lazily to avoid pulling in torch/pynvml at collection time."""
-    pass
-
-
 # Fixture re-exports: these must be importable from plugin.py for pytest to find them.
 # Use lazy imports so the heavy modules are only loaded when the fixture is actually used.
 
@@ -101,8 +95,56 @@ def gpu_benchmark(request: pytest.FixtureRequest) -> Any:
     return _BenchmarkRunner(warmup=warmup, rounds=rounds)
 
 
-# Re-export the canonical gpu_device fixture so pytest discovers it from this plugin.
-from gpucheck.fixtures.gpu import gpu_device as gpu_device  # noqa: F401, E402
+@pytest.fixture()
+def gpu_device(request: pytest.FixtureRequest) -> Any:
+    """Provide a GPU device for the test, honoring --gpu-device CLI option.
+
+    When --gpu-device is explicitly set to something other than the default
+    ``cuda:0``, a torch.device string is returned directly. Otherwise,
+    falls back to auto-detection via pynvml/torch.
+    """
+    from gpucheck.fixtures.gpu import GPUDevice, _cleanup_gpu, detect_gpu
+
+    cli_device: str = request.config.getoption("--gpu-device", default="cuda:0")
+
+    # If the user overrode the default, build a GPUDevice from the CLI value.
+    if cli_device != "cuda:0":
+        import torch
+
+        if not torch.cuda.is_available():
+            pytest.skip("No GPU available")
+
+        # Parse "cuda:N" -> N
+        try:
+            device_id = int(cli_device.split(":")[-1])
+        except (ValueError, IndexError):
+            pytest.fail(f"Invalid --gpu-device format: {cli_device!r} (expected 'cuda:N')")
+
+        if device_id >= torch.cuda.device_count():
+            pytest.fail(
+                f"Device {cli_device!r} not available "
+                f"(only {torch.cuda.device_count()} GPU(s) detected)"
+            )
+
+        props = torch.cuda.get_device_properties(device_id)
+        mem_free, mem_total = torch.cuda.mem_get_info(device_id)
+        device = GPUDevice(
+            device_id=device_id,
+            name=props.name,
+            compute_capability=(props.major, props.minor),
+            memory_total=mem_total,
+            memory_free=mem_free,
+        )
+        yield device
+        _cleanup_gpu()
+        return
+
+    # Default path: auto-detect via pynvml / torch.
+    detected = detect_gpu()
+    if detected is None:
+        pytest.skip("No GPU available")
+    yield detected
+    _cleanup_gpu()
 
 
 @pytest.fixture()

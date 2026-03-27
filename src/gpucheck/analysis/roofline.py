@@ -68,6 +68,7 @@ class RooflinePoint:
     achieved_flops: float = 0.0  # FLOP/s
     achieved_bandwidth: float = 0.0  # bytes/s
     peak_bandwidth: float = 0.0  # bytes/s — needed for bandwidth utilization
+    peak_flops: float = 0.0  # FLOP/s — device peak (not clamped to ceiling)
 
     @property
     def compute_utilization(self) -> float:
@@ -138,6 +139,7 @@ def compute_roofline(
         achieved_flops=achieved_flops,
         achieved_bandwidth=achieved_bw,
         peak_bandwidth=gpu_specs.peak_bandwidth if gpu_specs is not None else 0.0,
+        peak_flops=gpu_specs.peak_flops if gpu_specs is not None else 0.0,
     )
 
 
@@ -185,9 +187,8 @@ def classify_bottleneck(point: RooflinePoint, tolerance: float = 0.10) -> Bottle
         return "balanced"
 
     # If peak_bandwidth is available, compute the ridge point and use tolerance
-    if point.peak_bandwidth > 0 and point.peak_throughput > 0:
-        peak_flops_s = point.peak_throughput * 1e9  # convert GFLOP/s to FLOP/s
-        ridge = peak_flops_s / point.peak_bandwidth  # FLOP/byte
+    if point.peak_bandwidth > 0 and point.peak_flops > 0:
+        ridge = point.peak_flops / point.peak_bandwidth  # FLOP/byte
         lo = ridge * (1.0 - tolerance)
         hi = ridge * (1.0 + tolerance)
         if ai < lo:

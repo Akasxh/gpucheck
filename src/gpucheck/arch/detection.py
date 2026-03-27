@@ -23,8 +23,8 @@ SM_TO_ARCH: dict[tuple[int, int], str] = {
     (8, 7): "Ampere",
     (8, 9): "Ada",
     (9, 0): "Hopper",
-    (10, 0): "Blackwell",
-    (12, 0): "Blackwell",
+    (10, 0): "Blackwell-DC",
+    (12, 0): "Blackwell-Consumer",
 }
 
 # Minimum compute capability for dtype support
@@ -57,9 +57,9 @@ def _resolve_arch(cc: tuple[int, int]) -> str:
         if cc[0] == major:
             return name
     if cc >= (12, 0):
-        return "Blackwell"
+        return "Blackwell-Consumer"
     if cc >= (10, 0):
-        return "Blackwell"
+        return "Blackwell-DC"
     if cc >= (9, 0):
         return "Hopper"
     if cc >= (8, 9):

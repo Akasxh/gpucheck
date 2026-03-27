@@ -17,6 +17,13 @@ if TYPE_CHECKING:
 # GitHub Actions annotations
 # ---------------------------------------------------------------------------
 
+# Maps TestResult.status -> (annotation command, label prefix)
+_ANNOTATION_MAP: dict[str, tuple[str, str]] = {
+    "failed": ("error", "FAIL"),
+    "error": ("error", "ERROR"),
+    "skipped": ("warning", "SKIP"),
+}
+
 
 def emit_github_annotations(results: Sequence[TestResult]) -> None:
     """Write GitHub Actions `::error::` / `::warning::` annotations to stdout.
@@ -27,20 +34,19 @@ def emit_github_annotations(results: Sequence[TestResult]) -> None:
         return
 
     for r in results:
-        loc = ""
+        entry = _ANNOTATION_MAP.get(r.status)
+        if entry is None:
+            continue
+        cmd, label = entry
+        props: list[str] = []
         if r.file:
-            loc = f" file={r.file}"
+            props.append(f"file={r.file}")
             if r.line:
-                loc += f",line={r.line}"
-        if r.status == "failed":
-            msg = r.message.replace("\n", "%0A")
-            sys.stdout.write(f"::error{loc} title=FAIL: {r.name}::{msg}\n")
-        elif r.status == "error":
-            msg = r.message.replace("\n", "%0A")
-            sys.stdout.write(f"::error{loc} title=ERROR: {r.name}::{msg}\n")
-        elif r.status == "skipped":
-            msg = r.message.replace("\n", "%0A")
-            sys.stdout.write(f"::warning{loc} title=SKIP: {r.name}::{msg}\n")
+                props.append(f"line={r.line}")
+        safe_name = r.name.replace("::", " - ")
+        props.append(f"title={label}: {safe_name}")
+        msg = r.message.replace("\n", "%0A")
+        sys.stdout.write(f"::{cmd} {','.join(props)}::{msg}\n")
 
 
 # ---------------------------------------------------------------------------

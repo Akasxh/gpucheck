@@ -23,6 +23,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+import pytest
 import torch
 import torch.cuda
 
@@ -126,6 +127,18 @@ def _cv(data: list[float]) -> float:
     if m == 0:
         return 0.0
     return (statistics.stdev(data) / m) * 100.0
+
+
+# ──────────────────────────────────────────────────────────────
+# Fixtures
+# ──────────────────────────────────────────────────────────────
+
+@pytest.fixture(autouse=True, scope="module")
+def _init_cuda_tensors() -> None:
+    """Allocate GPU tensors once before any test in this module."""
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA not available")
+    _init_tensors()
 
 
 # ──────────────────────────────────────────────────────────────

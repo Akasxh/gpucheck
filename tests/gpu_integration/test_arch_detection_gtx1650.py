@@ -177,12 +177,21 @@ class TestDtypeSupport:
 # ---------------------------------------------------------------------------
 
 class TestTensorCoreGeneration:
-    def test_tensor_core_gen_is_2(self, gpu_info: GPUInfo) -> None:
-        # Turing = 2nd generation tensor cores
-        assert gpu_info.tensor_core_generation == 2
+    def test_tensor_core_gen_gtx1650_is_none(self, gpu_info: GPUInfo) -> None:
+        # GTX 16xx shares SM75 with RTX 20xx but lacks tensor cores
+        if "GTX 16" in gpu_info.name:
+            assert gpu_info.tensor_core_generation is None
+        else:
+            # RTX 20xx Turing cards have 2nd gen tensor cores
+            assert gpu_info.tensor_core_generation == 2
 
-    def test_tensor_core_gen_function(self) -> None:
+    def test_tensor_core_gen_function_with_name(self) -> None:
+        # Without a name, _tensor_core_gen returns 2 for SM75 (generic Turing)
         assert _tensor_core_gen((7, 5)) == 2
+        # With GTX 16xx name, it correctly returns None
+        assert _tensor_core_gen((7, 5), name="NVIDIA GeForce GTX 1650") is None
+        # RTX cards keep tensor cores
+        assert _tensor_core_gen((7, 5), name="NVIDIA GeForce RTX 2080") == 2
 
 
 # ---------------------------------------------------------------------------
@@ -389,5 +398,5 @@ class TestCrossValidateWithNvidiaSmi:
         # TF32: cc >= (8, 0)
         assert gpu_info.supports_tf32 == (cc >= (8, 0))
 
-        # Tensor core generation
-        assert gpu_info.tensor_core_generation == _tensor_core_gen(cc)
+        # Tensor core generation (must pass name for GTX 16xx detection)
+        assert gpu_info.tensor_core_generation == _tensor_core_gen(cc, gpu_info.name)
