@@ -75,7 +75,6 @@ def mann_whitney_u(
     unique_vals, unique_indices, unique_counts = np.unique(
         sorted_values, return_index=True, return_counts=True
     )
-    unique_counts.tolist()
     for idx, count in zip(unique_indices, unique_counts, strict=False):
         avg_rank = (2 * idx + count + 1) / 2.0  # 1-based average rank
         ranks[idx:idx + count] = avg_rank

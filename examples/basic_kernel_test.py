@@ -17,6 +17,7 @@ import gpucheck as gc
 def test_my_kernel(dtype, shape):
     """Test a simple element-wise kernel across dtypes and shapes."""
     torch = pytest.importorskip("torch")
+    dtype = getattr(torch, dtype) if isinstance(dtype, str) else dtype
 
     # Reference: CPU computation
     a = torch.randn(shape, dtype=torch.float32)
@@ -28,7 +29,9 @@ def test_my_kernel(dtype, shape):
     b_cast = b.to(dtype)
     output = (a_cast + b_cast).float()
 
-    gc.assert_close(output, reference, baseline_2x=True)
+    # Tolerance must reflect the compute precision (dtype), not the storage precision (float32)
+    atol, rtol = gc.compute_tolerance(dtype)
+    gc.assert_close(output, reference, atol=atol * 2, rtol=rtol * 2)
 
 
 @gc.dtypes("float32")
@@ -36,6 +39,7 @@ def test_my_kernel(dtype, shape):
 def test_relu_kernel(dtype, shape):
     """Test a ReLU-like operation."""
     torch = pytest.importorskip("torch")
+    dtype = getattr(torch, dtype) if isinstance(dtype, str) else dtype
 
     x = torch.randn(shape, dtype=dtype)
     output = torch.clamp(x, min=0)

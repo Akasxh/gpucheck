@@ -28,6 +28,26 @@ SM_ARCH_MAP: dict[str, str] = {
     "SM120": "Blackwell-Consumer",
 }
 
+# Fine-grained Blackwell variants for users who need to distinguish DC vs Consumer.
+SM_ARCH_MAP_DETAILED: dict[str, str] = {
+    "SM100": "Blackwell-DC",
+    "SM120": "Blackwell-Consumer",
+}
+
+# Arch family aliases: a parent name expands to itself + all sub-variants.
+# This lets require_arch("Blackwell") match GPUs detected as "Blackwell-DC"
+# or "Blackwell-Consumer", while require_arch("Blackwell-DC") only matches
+# datacenter Blackwell (SM100).
+_ARCH_ALIASES: dict[str, set[str]] = {
+    "blackwell": {"blackwell", "blackwell-dc", "blackwell-consumer"},
+}
+
+# Parent architecture names that map to a representative SM tag for
+# compatibility checking (e.g. "Blackwell" → "SM100").
+_ARCH_PARENT_SM: dict[str, str] = {
+    "blackwell": "SM100",
+}
+
 
 def _get_primary_gpu() -> GPUInfo | None:
     """Return the first available GPU, or None."""
@@ -44,8 +64,14 @@ def require_arch(*archs: str) -> Callable[..., Any]:
         def test_something():
             ...
     """
-    # Normalize: accept both "Ampere" and "ampere"
-    normalized = {a.lower() for a in archs}
+    # Normalize: accept both "Ampere" and "ampere", and expand aliases
+    normalized: set[str] = set()
+    for a in archs:
+        key = a.lower()
+        if key in _ARCH_ALIASES:
+            normalized |= _ARCH_ALIASES[key]
+        else:
+            normalized.add(key)
 
     def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(fn)
@@ -131,11 +157,21 @@ def check_compatibility(kernel_target: str, gpu_info: GPUInfo) -> list[str]:
     # Normalize kernel_target to SM tag
     target_sm = kernel_target.upper()
     if not target_sm.startswith("SM"):
-        # Try to resolve architecture name to an SM tag
-        for sm, arch in SM_ARCH_MAP.items():
-            if arch.lower() == kernel_target.lower():
-                target_sm = sm
+        # Try to resolve architecture name to an SM tag.
+        # Check detailed variants first (e.g. "Blackwell-DC" → "SM100"),
+        # then fall back to the main map (e.g. "Blackwell" → "SM100").
+        target_lower = kernel_target.lower()
+        resolved = False
+        for source in (SM_ARCH_MAP_DETAILED, SM_ARCH_MAP):
+            for sm, arch in source.items():
+                if arch.lower() == target_lower:
+                    target_sm = sm
+                    resolved = True
+                    break
+            if resolved:
                 break
+        if not resolved and target_lower in _ARCH_PARENT_SM:
+            target_sm = _ARCH_PARENT_SM[target_lower]
 
     gpu_sm = _cc_to_sm_tag(gpu_info.compute_capability)
 

@@ -67,12 +67,43 @@ def _to_numpy(tensor: Any) -> npt.NDArray[Any]:
     return np.asarray(tensor)
 
 
+def _is_float_dtype(d: Any) -> bool:
+    """Check if a dtype represents a floating-point type."""
+    name = str(d).lower()
+    return any(k in name for k in ("float", "bfloat", "half"))
+
+
 def _resolve_dtype(actual: Any, expected: Any) -> Any:
-    """Return the dtype object from whichever input carries one."""
-    for t in (actual, expected):
-        if hasattr(t, "dtype"):
-            return t.dtype
-    return np.float32
+    """Return the dtype that should govern tolerance lookup.
+
+    For mixed-precision float comparisons (e.g. fp16 actual vs fp32 expected),
+    the lower-precision dtype is the precision-limiting factor.
+
+    For mixed int/float comparisons (e.g. int8 vs fp16), the float dtype is
+    always preferred — int dtypes fall back to float32 defaults, which may be
+    tighter than the actual float dtype's tolerance.
+    """
+    dtypes = [t.dtype for t in (actual, expected) if hasattr(t, "dtype")]
+    if not dtypes:
+        return np.float32
+    if len(dtypes) == 1:
+        return dtypes[0]
+
+    # Mixed int/float: always prefer the float dtype for tolerance lookup.
+    float_flags = [_is_float_dtype(d) for d in dtypes]
+    if float_flags[0] != float_flags[1]:
+        return dtypes[0] if float_flags[0] else dtypes[1]
+
+    # Both same category: use the lower-precision one (smaller itemsize).
+    sizes = []
+    for d in dtypes:
+        if hasattr(d, "itemsize"):
+            sizes.append(d.itemsize)
+        else:
+            sizes.append(4)  # fallback to float32 size
+    if sizes[0] <= sizes[1]:
+        return dtypes[0]
+    return dtypes[1]
 
 
 def assert_close(
@@ -118,8 +149,8 @@ def assert_close(
             import math
 
             doubled_atol *= math.sqrt(k_dim)
-        eff_atol = atol if atol is not None else doubled_atol
-        eff_rtol = rtol if rtol is not None else doubled_rtol
+        eff_atol = doubled_atol
+        eff_rtol = doubled_rtol
     else:
         default_atol, default_rtol = compute_tolerance(dtype, k_dim=k_dim)
         eff_atol = atol if atol is not None else default_atol
@@ -133,11 +164,16 @@ def assert_close(
         _has_torch
         and isinstance(actual, _torch.Tensor)
         and isinstance(expected, _torch.Tensor)
+        and actual.device == expected.device
         and actual.device.type == "cuda"
-        and expected.device.type == "cuda"
-        and _torch.allclose(actual, expected, atol=eff_atol, rtol=eff_rtol, equal_nan=nan_equal)
+        and actual.shape == expected.shape
     ):
-        return  # PASS — no CPU transfer needed
+        try:
+            if _torch.allclose(actual, expected, atol=eff_atol, rtol=eff_rtol, equal_nan=nan_equal):
+                return  # PASS — no CPU transfer needed
+        except RuntimeError as exc:
+            if "allclose" not in str(exc).lower() and "match" not in str(exc).lower():
+                raise  # Re-raise genuine CUDA errors
 
     # --- Slow path: rich error reporting via numpy ---
     actual_np = _to_numpy(actual)

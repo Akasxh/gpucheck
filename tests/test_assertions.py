@@ -222,3 +222,70 @@ class TestMismatchReportFormat:
         report = format_mismatch_report(actual, expected, atol=1e-5, rtol=1e-5)
         assert "NaN" in report
         assert "Inf" in report
+
+
+# ---------------------------------------------------------------------------
+# baseline_2x tolerance doubling
+# ---------------------------------------------------------------------------
+
+
+class TestBaseline2xDoublesTolerance:
+    """baseline_2x=True should double the dtype-default tolerances."""
+
+    def test_baseline_2x_passes_with_doubled_tolerance(self) -> None:
+        """Value within 2x tolerance but outside 1x should pass with baseline_2x."""
+        base_atol, base_rtol = compute_tolerance("float32")
+        # Create arrays with difference just above 1x tolerance but below 2x
+        a = np.array([0.0], dtype=np.float32)
+        b = np.array([base_atol * 1.5], dtype=np.float32)
+        # Should fail without baseline_2x
+        with pytest.raises(AssertionError):
+            assert_close(a, b)
+        # Should pass with baseline_2x
+        assert_close(a, b, baseline_2x=True)
+
+    def test_baseline_2x_fails_beyond_doubled_tolerance(self) -> None:
+        """Value beyond 2x tolerance should still fail with baseline_2x."""
+        base_atol, _ = compute_tolerance("float32")
+        a = np.array([0.0], dtype=np.float32)
+        b = np.array([base_atol * 2.5], dtype=np.float32)
+        with pytest.raises(AssertionError):
+            assert_close(a, b, baseline_2x=True)
+
+
+# ---------------------------------------------------------------------------
+# Mixed-precision _resolve_dtype
+# ---------------------------------------------------------------------------
+
+
+class TestMixedPrecisionDtype:
+    """Mixed-precision comparisons should use the lower-precision dtype's tolerance."""
+
+    def test_fp16_fp32_uses_fp16_tolerance_order1(self) -> None:
+        """fp16 actual + fp32 expected -> fp16 tolerance (wider)."""
+        fp16_atol, _ = compute_tolerance("float16")
+        fp32_atol, _ = compute_tolerance("float32")
+        # Difference between fp16 and fp32 tolerances is large (1e-2 vs 1e-4)
+        a = np.array([0.0], dtype=np.float16)
+        b = np.array([fp32_atol * 5], dtype=np.float32)  # above fp32 tol, below fp16 tol
+        # Should pass because fp16 tolerance (1e-2) is used, not fp32 (1e-4)
+        assert_close(a, b)
+
+    def test_fp32_fp16_uses_fp16_tolerance_order2(self) -> None:
+        """fp32 actual + fp16 expected -> fp16 tolerance (wider), same as reversed order."""
+        fp32_atol, _ = compute_tolerance("float32")
+        a = np.array([0.0], dtype=np.float32)
+        b = np.array([fp32_atol * 5], dtype=np.float16)  # above fp32 tol, below fp16 tol
+        # Should also pass — order should not matter
+        assert_close(a, b)
+
+    def test_both_orders_produce_same_result(self) -> None:
+        """Swapping actual/expected dtypes should not change pass/fail outcome."""
+        val = np.float32(5e-3)  # between fp32 tol (1e-4) and fp16 tol (1e-2)
+        a16 = np.array([0.0], dtype=np.float16)
+        b32 = np.array([val], dtype=np.float32)
+        a32 = np.array([0.0], dtype=np.float32)
+        b16 = np.array([val], dtype=np.float16)
+        # Both orders should pass (fp16 tolerance used in both cases)
+        assert_close(a16, b32)
+        assert_close(a32, b16)

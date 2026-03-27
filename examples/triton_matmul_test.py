@@ -41,6 +41,8 @@ def test_triton_matmul_correctness(dtype: Any, shape: tuple[int, ...]) -> None:
     import triton
     import triton.language as tl
 
+    dtype = getattr(torch, dtype) if isinstance(dtype, str) else dtype
+
     @triton.jit
     def matmul_kernel(
         a_ptr, b_ptr, c_ptr,

@@ -7,7 +7,9 @@ from unittest.mock import patch
 import pytest
 
 from gpucheck.arch.compatibility import (
+    SM_ARCH_MAP,
     _cc_to_sm_tag,
+    check_compatibility,
     require_arch,
     require_capability,
 )
@@ -228,3 +230,123 @@ class TestTensorCoreSupportMapping:
     def test_sm_to_sm_tag(self) -> None:
         assert _cc_to_sm_tag((8, 0)) == "SM80"
         assert _cc_to_sm_tag((9, 0)) == "SM90"
+
+
+# ---------------------------------------------------------------------------
+# Blackwell naming consistency
+# ---------------------------------------------------------------------------
+
+
+class TestBlackwellNamingConsistency:
+    """Detection and compatibility must agree on Blackwell naming."""
+
+    def test_detection_reports_blackwell(self) -> None:
+        assert _resolve_arch((10, 0)) == "Blackwell-DC"
+        assert _resolve_arch((12, 0)) == "Blackwell-Consumer"
+
+    def test_sm_arch_map_uses_blackwell(self) -> None:
+        assert SM_ARCH_MAP["SM100"] == "Blackwell-DC"
+        assert SM_ARCH_MAP["SM120"] == "Blackwell-Consumer"
+
+    def test_require_arch_blackwell_matches_dc(self) -> None:
+        mock_gpu = GPUInfo(
+            device_id=0, name="B200", compute_capability=(10, 0),
+            architecture="Blackwell-DC", memory_total_mb=196608,
+            memory_free_mb=190000, driver_version="", cuda_version="",
+            supports_fp16=True, supports_bf16=True, supports_fp8=True,
+            supports_tf32=True, tensor_core_generation=5,
+            max_shared_memory_per_block=228 * 1024,
+        )
+        with patch(
+            "gpucheck.arch.compatibility._get_primary_gpu",
+            return_value=mock_gpu,
+        ):
+            @require_arch("Blackwell")
+            def my_test() -> str:
+                return "ran"
+
+            assert my_test() == "ran"
+
+    def test_require_arch_blackwell_matches_consumer(self) -> None:
+        mock_gpu = GPUInfo(
+            device_id=0, name="RTX 5090", compute_capability=(12, 0),
+            architecture="Blackwell-Consumer", memory_total_mb=32768,
+            memory_free_mb=30000, driver_version="", cuda_version="",
+            supports_fp16=True, supports_bf16=True, supports_fp8=True,
+            supports_tf32=True, tensor_core_generation=5,
+            max_shared_memory_per_block=228 * 1024,
+        )
+        with patch(
+            "gpucheck.arch.compatibility._get_primary_gpu",
+            return_value=mock_gpu,
+        ):
+            @require_arch("Blackwell")
+            def my_test() -> str:
+                return "ran"
+
+            assert my_test() == "ran"
+
+    def test_require_arch_blackwell_dc_runs_on_dc(self) -> None:
+        mock_gpu = GPUInfo(
+            device_id=0, name="B200", compute_capability=(10, 0),
+            architecture="Blackwell-DC", memory_total_mb=196608,
+            memory_free_mb=190000, driver_version="", cuda_version="",
+            supports_fp16=True, supports_bf16=True, supports_fp8=True,
+            supports_tf32=True, tensor_core_generation=5,
+            max_shared_memory_per_block=228 * 1024,
+        )
+        with patch(
+            "gpucheck.arch.compatibility._get_primary_gpu",
+            return_value=mock_gpu,
+        ):
+            @require_arch("Blackwell-DC")
+            def my_test() -> str:
+                return "ran"
+
+            assert my_test() == "ran"
+
+    def test_require_arch_blackwell_dc_skips_consumer(self) -> None:
+        mock_gpu = GPUInfo(
+            device_id=0, name="RTX 5090", compute_capability=(12, 0),
+            architecture="Blackwell-Consumer", memory_total_mb=32768,
+            memory_free_mb=30000, driver_version="", cuda_version="",
+            supports_fp16=True, supports_bf16=True, supports_fp8=True,
+            supports_tf32=True, tensor_core_generation=5,
+            max_shared_memory_per_block=228 * 1024,
+        )
+        with patch(
+            "gpucheck.arch.compatibility._get_primary_gpu",
+            return_value=mock_gpu,
+        ):
+            @require_arch("Blackwell-DC")
+            def my_test() -> str:
+                return "ran"
+
+            with pytest.raises(pytest.skip.Exception):
+                my_test()
+
+    def test_check_compatibility_blackwell_resolves(self) -> None:
+        mock_gpu = GPUInfo(
+            device_id=0, name="H100", compute_capability=(9, 0),
+            architecture="Hopper", memory_total_mb=81920,
+            memory_free_mb=80000, driver_version="", cuda_version="",
+            supports_fp16=True, supports_bf16=True, supports_fp8=True,
+            supports_tf32=True, tensor_core_generation=4,
+            max_shared_memory_per_block=228 * 1024,
+        )
+        # "Blackwell" should resolve to an SM tag and produce a forward-compat warning
+        issues = check_compatibility("Blackwell", mock_gpu)
+        assert len(issues) > 0
+
+    def test_check_compatibility_blackwell_dc_resolves(self) -> None:
+        mock_gpu = GPUInfo(
+            device_id=0, name="H100", compute_capability=(9, 0),
+            architecture="Hopper", memory_total_mb=81920,
+            memory_free_mb=80000, driver_version="", cuda_version="",
+            supports_fp16=True, supports_bf16=True, supports_fp8=True,
+            supports_tf32=True, tensor_core_generation=4,
+            max_shared_memory_per_block=228 * 1024,
+        )
+        # "Blackwell-DC" should also resolve to SM100 and produce warnings
+        issues = check_compatibility("Blackwell-DC", mock_gpu)
+        assert len(issues) > 0
