@@ -266,7 +266,7 @@ wheels = [
 
 [[package]]
 name = "gpucheck"
-version = "0.1.0"
+version = "1.0.0rc1"
 source = { editable = "." }
 dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -278,6 +278,9 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "hypothesis", extra = ["numpy"] },
+    { name = "torch" },
+]
+apple = [
     { name = "torch" },
 ]
 cupy = [
@@ -293,6 +296,9 @@ dev = [
 hypothesis = [
     { name = "hypothesis", extra = ["numpy"] },
 ]
+mps = [
+    { name = "torch" },
+]
 torch = [
     { name = "torch" },
 ]
@@ -304,6 +310,7 @@ triton = [
 requires-dist = [
     { name = "cupy-cuda12x", marker = "extra == 'cupy'", specifier = ">=13.0" },
     { name = "gpucheck", extras = ["all"], marker = "extra == 'dev'" },
+    { name = "gpucheck", extras = ["mps"], marker = "extra == 'apple'" },
     { name = "gpucheck", extras = ["torch", "hypothesis"], marker = "extra == 'all'" },
     { name = "hypothesis", marker = "extra == 'hypothesis'", specifier = ">=6.0" },
     { name = "hypothesis", extras = ["numpy"], marker = "extra == 'hypothesis'" },
@@ -313,10 +320,11 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
     { name = "rich", specifier = ">=13.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4" },
+    { name = "torch", marker = "extra == 'mps'", specifier = ">=2.6" },
     { name = "torch", marker = "extra == 'torch'", specifier = ">=2.0" },
     { name = "triton", marker = "extra == 'triton'", specifier = ">=3.0" },
 ]
-provides-extras = ["torch", "cupy", "triton", "hypothesis", "all", "dev"]
+provides-extras = ["torch", "mps", "apple", "cupy", "triton", "hypothesis", "all", "dev"]
 
 [[package]]
 name = "hypothesis"
