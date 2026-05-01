@@ -139,10 +139,20 @@ def assert_close(
     """
     dtype = _resolve_dtype(actual, expected)
 
+    # --- Resolve device type so MPS gets the PROVISIONAL 2x tolerance overlay ---
+    # SYNTHESIS §7: MPS multipliers are PROVISIONAL until calibrated on
+    # M-silicon; numbers may inflate post-calibration.
+    device_type: str | None = None
+    if _has_torch:
+        for t in (actual, expected):
+            if isinstance(t, _torch.Tensor):
+                device_type = t.device.type
+                break
+
     # --- Compute effective tolerances up-front (needed by both paths) ---
     if baseline_2x and atol is None and rtol is None:
         # FlashAttention 2x: double base tolerance BEFORE k_dim scaling
-        base_atol, base_rtol = compute_tolerance(dtype)
+        base_atol, base_rtol = compute_tolerance(dtype, device_type=device_type)
         doubled_atol, doubled_rtol = base_atol * 2.0, base_rtol * 2.0
         # Now apply k_dim scaling on the doubled base
         if k_dim is not None and k_dim > 0:
@@ -152,7 +162,9 @@ def assert_close(
         eff_atol = doubled_atol
         eff_rtol = doubled_rtol
     else:
-        default_atol, default_rtol = compute_tolerance(dtype, k_dim=k_dim)
+        default_atol, default_rtol = compute_tolerance(
+            dtype, k_dim=k_dim, device_type=device_type,
+        )
         eff_atol = atol if atol is not None else default_atol
         eff_rtol = rtol if rtol is not None else default_rtol
         if baseline_2x:
@@ -160,12 +172,13 @@ def assert_close(
             eff_rtol *= 2.0
 
     # --- GPU fast-path: avoid CPU transfer when tensors match ---
+    # Widened to MPS in v1.0; torch.allclose is device-agnostic.
     if (
         _has_torch
         and isinstance(actual, _torch.Tensor)
         and isinstance(expected, _torch.Tensor)
         and actual.device == expected.device
-        and actual.device.type == "cuda"
+        and actual.device.type in ("cuda", "mps")
         and actual.shape == expected.shape
     ):
         try:
@@ -173,7 +186,7 @@ def assert_close(
                 return  # PASS — no CPU transfer needed
         except RuntimeError as exc:
             if "allclose" not in str(exc).lower() and "match" not in str(exc).lower():
-                raise  # Re-raise genuine CUDA errors
+                raise  # Re-raise genuine CUDA / MPS errors
 
     # --- Slow path: rich error reporting via numpy ---
     actual_np = _to_numpy(actual)

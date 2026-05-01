@@ -5,13 +5,16 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING, Any
 
-__version__ = "0.1.0"
+__version__ = "1.0.0rc1"
 
 
 _LAZY_MAP: dict[str, tuple[str, str]] = {
     "assert_close": ("gpucheck.assertions", "assert_close"),
     "compute_tolerance": ("gpucheck.assertions", "compute_tolerance"),
     "tolerance_context": ("gpucheck.assertions", "tolerance_context"),
+    "is_mps_xfailed": ("gpucheck.assertions", "is_mps_xfailed"),
+    "mps_xfail_list": ("gpucheck.assertions", "mps_xfail_list"),
+    "register_mps_xfail": ("gpucheck.assertions", "register_mps_xfail"),
     "dtypes": ("gpucheck.decorators", "dtypes"),
     "shapes": ("gpucheck.decorators", "shapes"),
     "devices": ("gpucheck.decorators", "devices"),
@@ -31,6 +34,9 @@ _LAZY_MAP: dict[str, tuple[str, str]] = {
     "gpu_count": ("gpucheck.arch", "gpu_count"),
     "BenchmarkResult": ("gpucheck.fixtures.benchmark", "BenchmarkResult"),
     "GPUDevice": ("gpucheck.fixtures.gpu", "GPUDevice"),
+    "available_backends": ("gpucheck.backends", "available_backends"),
+    "get_backend": ("gpucheck.backends", "get_backend"),
+    "Backend": ("gpucheck.backends", "Backend"),
 }
 
 
@@ -69,6 +75,11 @@ if TYPE_CHECKING:
 __all__ = [
     "__version__",
     "assert_close",
+    "compute_tolerance",
+    "tolerance_context",
+    "is_mps_xfailed",
+    "mps_xfail_list",
+    "register_mps_xfail",
     "dtypes",
     "shapes",
     "devices",
@@ -80,6 +91,9 @@ __all__ = [
     "gpu_count",
     "BenchmarkResult",
     "GPUDevice",
+    "available_backends",
+    "get_backend",
+    "Backend",
     "FLOAT_DTYPES",
     "HALF_DTYPES",
     "ALL_DTYPES",
