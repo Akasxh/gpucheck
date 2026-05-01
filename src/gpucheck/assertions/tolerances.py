@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -23,9 +24,23 @@ _DEFAULT_TOLERANCES: dict[str, tuple[float, float]] = {
     "tf32": (5e-4, 5e-4),
 }
 
-# Override stack (module-level). NOT thread-safe — each thread/worker should use
-# its own process (pytest-xdist worker) for parallel test execution.
-_tolerance_overrides: list[tuple[float, float]] = []
+# Override stack (per-context). Backed by ``contextvars.ContextVar`` so the
+# stack is isolated per OS thread AND per asyncio task. Previous releases
+# used a plain module-level list, which leaked overrides between threads
+# when tests were run inside a single process (e.g. with a thread pool).
+# The contract is unchanged from the user's perspective:
+#
+#     with tolerance_context(atol=1e-3, rtol=1e-3):
+#         assert_close(a, b)
+#
+# Inside the ``with`` block, the calling thread/task observes its own
+# top-of-stack overlay; a sibling thread that has not entered a
+# tolerance_context block sees the underlying defaults. ContextVar.set
+# returns a Token that ``ContextVar.reset`` consumes, restoring the prior
+# value — this is correct under exception unwinding.
+_tolerance_overrides: ContextVar[tuple[tuple[float, float], ...]] = ContextVar(
+    "_tolerance_overrides", default=(),
+)
 
 
 def _normalize_dtype_name(dtype: Any) -> str:
@@ -52,9 +67,10 @@ def compute_tolerance(
 
     Falls back to float32 tolerances for unknown dtypes.
     """
-    # Check override stack first.
-    if _tolerance_overrides:
-        return _tolerance_overrides[-1]
+    # Check override stack first (ContextVar for thread/task isolation).
+    overrides = _tolerance_overrides.get()
+    if overrides:
+        return overrides[-1]
 
     name = _normalize_dtype_name(dtype)
     # Check config overlay first, then defaults
@@ -76,16 +92,21 @@ def tolerance_context(
 ) -> Generator[None, None, None]:
     """Temporarily override default tolerances returned by :func:`compute_tolerance`.
 
+    Backed by ``contextvars.ContextVar``: the override is visible only to
+    the current OS thread (and to asyncio tasks that copied the current
+    context). Sibling threads observe the underlying defaults concurrently.
+
     Usage::
 
         with tolerance_context(atol=1e-3, rtol=1e-3):
             assert_close(a, b)
     """
-    _tolerance_overrides.append((atol, rtol))
+    current = _tolerance_overrides.get()
+    token = _tolerance_overrides.set(current + ((atol, rtol),))
     try:
         yield
     finally:
-        _tolerance_overrides.pop()
+        _tolerance_overrides.reset(token)
 
 
 def tolerances_from_config(config: dict[str, Any]) -> dict[str, tuple[float, float]] | None:
