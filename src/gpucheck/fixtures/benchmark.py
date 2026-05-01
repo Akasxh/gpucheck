@@ -153,7 +153,17 @@ class _BenchmarkRunner:
         flush_l2: bool | None = None,
         **kwargs: Any,
     ) -> BenchmarkResult:
-        """Benchmark *fn* using CUDA events for accurate GPU timing.
+        """Benchmark *fn* using accurate GPU timing.
+
+        Backend selection:
+
+        - **CUDA**: ``torch.cuda.Event(enable_timing=True)`` start/end +
+          ``torch.cuda.synchronize()`` (microsecond resolution).
+        - **MPS**: ``torch.mps.synchronize()`` (device-level) +
+          ``time.perf_counter()`` for wall clock. The CUDA-style per-event
+          ``end.synchronize()`` pattern is deliberately avoided because it
+          deadlocks on Apple Silicon (pytorch#162872; SYNTHESIS §3).
+        - **No GPU**: ``pytest.skip``.
 
         Parameters
         ----------
@@ -166,7 +176,9 @@ class _BenchmarkRunner:
         rounds:
             Override default benchmark iterations.
         flush_l2:
-            Override default L2 flushing behaviour.
+            Override default L2 flushing behaviour. Ignored on MPS (no
+            L2-flush primitive); a one-time UserWarning is emitted by the
+            MPS backend.
         **kwargs:
             Keyword arguments forwarded to *fn*.
         """
@@ -174,39 +186,27 @@ class _BenchmarkRunner:
             import torch
         except ImportError as exc:
             raise RuntimeError(
-                "gpu_benchmark requires PyTorch for CUDA event timing. "
+                "gpu_benchmark requires PyTorch for accurate GPU timing. "
                 "Install it with: pip install torch"
             ) from exc
 
-        if not torch.cuda.is_available():
-            pytest.skip("CUDA not available for benchmarking")
+        cuda_avail = torch.cuda.is_available()
+        mps_avail = (
+            getattr(torch.backends, "mps", None) is not None
+            and torch.backends.mps.is_available()
+        )
+
+        if not cuda_avail and not mps_avail:
+            pytest.skip("No GPU (CUDA or MPS) available for benchmarking")
 
         n_warmup = warmup if warmup is not None else self.warmup
         n_rounds = rounds if rounds is not None else self.rounds
         do_flush = flush_l2 if flush_l2 is not None else self.flush_l2
 
-        # Warmup
-        for _ in range(n_warmup):
-            fn(*args, **kwargs)
-        torch.cuda.synchronize()
-
-        # Pre-allocate CUDA events to avoid per-iteration allocation overhead
-        start = torch.cuda.Event(enable_timing=True)  # type: ignore[no-untyped-call]
-        end = torch.cuda.Event(enable_timing=True)  # type: ignore[no-untyped-call]
-
-        # Timed runs
-        raw_times: list[float] = []
-        for _ in range(n_rounds):
-            if do_flush and self._l2_size > 0:
-                _flush_l2_cache(self._l2_size, buf=self._flush_buf)
-
-            start.record()
-            fn(*args, **kwargs)
-            end.record()
-
-            torch.cuda.synchronize()
-            elapsed_ms: float = start.elapsed_time(end)
-            raw_times.append(elapsed_ms)
+        if cuda_avail:
+            raw_times = self._run_cuda(fn, args, kwargs, n_warmup, n_rounds, do_flush)
+        else:
+            raw_times = self._run_mps(fn, args, kwargs, n_warmup, n_rounds, do_flush)
 
         # Outlier removal
         cleaned = _remove_outliers_iqr(raw_times)
@@ -242,10 +242,97 @@ class _BenchmarkRunner:
             raw_times=tuple(raw_times),
         )
 
+    # ------------------------------------------------------------------
+    # Backend-specific timing loops
+    # ------------------------------------------------------------------
+
+    def _run_cuda(
+        self,
+        fn: KernelCallable,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+        n_warmup: int,
+        n_rounds: int,
+        do_flush: bool,
+    ) -> list[float]:
+        """CUDA-events timing loop (microsecond accurate via cudaEvent_t)."""
+        import torch
+
+        for _ in range(n_warmup):
+            fn(*args, **kwargs)
+        torch.cuda.synchronize()
+
+        # Pre-allocate CUDA events to avoid per-iteration allocation overhead.
+        start = torch.cuda.Event(enable_timing=True)  # type: ignore[no-untyped-call]
+        end = torch.cuda.Event(enable_timing=True)  # type: ignore[no-untyped-call]
+
+        raw_times: list[float] = []
+        for _ in range(n_rounds):
+            if do_flush and self._l2_size > 0:
+                _flush_l2_cache(self._l2_size, buf=self._flush_buf)
+
+            start.record()
+            fn(*args, **kwargs)
+            end.record()
+
+            torch.cuda.synchronize()
+            elapsed_ms: float = start.elapsed_time(end)
+            raw_times.append(elapsed_ms)
+        return raw_times
+
+    def _run_mps(
+        self,
+        fn: KernelCallable,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+        n_warmup: int,
+        n_rounds: int,
+        do_flush: bool,
+    ) -> list[float]:
+        """MPS timing loop using device-level sync + ``time.perf_counter()``.
+
+        SYNTHESIS §3 (load-bearing): we MUST NOT use the CUDA-style pattern
+        ``start.record(); end.record(); end.synchronize(); start.elapsed_time(end)``
+        on MPS — pytorch#162872 deadlocks the calling thread. The
+        device-level ``torch.mps.synchronize()`` is documented and stable on
+        PyTorch 2.6+.
+        """
+        import time
+
+        import torch
+
+        if do_flush:
+            warnings.warn(
+                "flush_l2=True ignored on MPS (no Apple GPU L2 flush primitive); "
+                "benchmark stability may be lower than on CUDA",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        # Warmup
+        torch.mps.synchronize()
+        for _ in range(n_warmup):
+            fn(*args, **kwargs)
+        torch.mps.synchronize()
+
+        raw_times: list[float] = []
+        for _ in range(n_rounds):
+            torch.mps.synchronize()
+            t0 = time.perf_counter()
+            fn(*args, **kwargs)
+            # Device-level sync — see SYNTHESIS §3 / pytorch#162872.
+            torch.mps.synchronize()
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
+            raw_times.append(elapsed_ms)
+        return raw_times
+
 
 @pytest.fixture()
 def gpu_benchmark() -> _BenchmarkRunner:
-    """Provide a GPU kernel benchmarker using CUDA event timing.
+    """Provide a GPU kernel benchmarker.
+
+    Uses ``torch.cuda.Event`` timing on NVIDIA, ``torch.mps.synchronize()``
+    + wall clock on Apple Silicon (pytorch#162872 deadlock-safe pattern).
 
     Usage::
 

@@ -47,6 +47,45 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line("markers", "gpu: marks tests requiring a GPU")
     config.addinivalue_line("markers", "slow: marks slow-running tests")
     config.addinivalue_line("markers", "multi_gpu: marks tests requiring multiple GPUs")
+    config.addinivalue_line("markers", "mps: marks tests requiring Apple Silicon MPS")
+
+    # Load tolerances + MPS xfail registry from pyproject.toml at session start.
+    _load_pyproject_config(config.rootpath)
+
+
+def _load_pyproject_config(rootpath: Any) -> None:
+    """Read ``pyproject.toml`` and apply gpucheck's tool sections.
+
+    Silent on failure — if the file is absent or unparseable, gpucheck falls
+    back to its built-in defaults. Uses stdlib ``tomllib`` (Python 3.11+) or
+    ``tomli`` (3.10) — both ship with the python toolchain we target.
+    """
+    try:
+        from pathlib import Path as _Path
+
+        pyproject = _Path(str(rootpath)) / "pyproject.toml"
+        if not pyproject.is_file():
+            return
+        # Python 3.11+ ships tomllib in the stdlib; 3.10 needs `tomli`.
+        # Both modules import as a name local to this function — mypy's
+        # static view doesn't know which Python we'll actually run on, so
+        # the import errors are silenced via the broad mypy override below.
+        try:
+            import tomllib
+        except ModuleNotFoundError:  # pragma: no cover  -- 3.10 fallback
+            import tomli as tomllib  # type: ignore[no-redef,unused-ignore]
+        with pyproject.open("rb") as f:
+            data = tomllib.load(f)
+        from gpucheck.assertions.tolerances import (
+            apply_config_tolerances,
+            apply_mps_xfail_config,
+        )
+
+        apply_config_tolerances(data)
+        apply_mps_xfail_config(data)
+    except Exception:
+        # Configuration is best-effort; never block the test session.
+        pass
 
 
 def pytest_collection_modifyitems(

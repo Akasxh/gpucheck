@@ -1,4 +1,4 @@
-"""Parametrize tests across GPU devices."""
+"""Parametrize tests across GPU devices (CUDA and MPS)."""
 
 from __future__ import annotations
 
@@ -22,6 +22,27 @@ def _detect_cuda_devices() -> list[str]:
         return []
 
 
+def _detect_mps_devices() -> list[str]:
+    """Return ``["mps"]`` if Apple Silicon MPS is available, else ``[]``.
+
+    PyTorch's MPS backend exposes a single logical device, so we never emit
+    ``mps:0``/``mps:1`` even on machines with an integrated + discrete GPU.
+    """
+    try:
+        import torch
+    except ImportError:
+        return []
+    mps = getattr(torch.backends, "mps", None)
+    if mps is None or not mps.is_available():
+        return []
+    return ["mps"]
+
+
+def _detect_devices() -> list[str]:
+    """Return all available accelerator device strings (CUDA first, then MPS)."""
+    return _detect_cuda_devices() + _detect_mps_devices()
+
+
 def _is_device_available(device: str) -> bool:
     """Check whether a device string is currently usable."""
     try:
@@ -36,6 +57,9 @@ def _is_device_available(device: str) -> bool:
                 idx = int(device.split(":")[1])
                 return idx < torch.cuda.device_count()
             return True
+        if device == "mps" or device.startswith("mps:"):
+            mps = getattr(torch.backends, "mps", None)
+            return bool(mps is not None and mps.is_available())
         # Unknown device type — let torch figure it out
         torch.device(device)
         return True
@@ -55,21 +79,25 @@ def _device_id(d: str) -> str:
 def devices(*device_args: str) -> Callable[..., Any]:
     """Parametrize a test across GPU devices.
 
-    If no arguments are given, auto-detects all available CUDA devices
-    (falls back to ``["cuda:0"]`` if detection finds nothing but CUDA
-    appears importable).
+    Recognized device strings:
 
-    Pass ``"all"`` to expand to every visible CUDA device.
+    - ``"cuda:N"`` — specific NVIDIA GPU
+    - ``"mps"`` — Apple Silicon GPU (single logical device)
+    - ``"all"`` — every available accelerator (CUDA devices + MPS if present)
+
+    If no arguments are given, auto-detects all available accelerators
+    (CUDA devices first, then MPS). Falls back to ``["cuda:0"]`` if
+    detection finds nothing — the test then skips at collection.
 
     Devices that are not available at collection time get
     ``pytest.mark.skip`` so the test is reported but not run.
 
     Examples::
 
-        @devices("cuda:0", "cuda:1")
+        @devices("cuda:0", "mps")
         def test_copy(device): ...
 
-        @devices()          # auto-detect
+        @devices()          # auto-detect (CUDA + MPS)
         def test_kernel(device): ...
 
         @devices("all")
@@ -78,12 +106,12 @@ def devices(*device_args: str) -> Callable[..., Any]:
     resolved: list[str] = []
 
     if not device_args or device_args == ("all",):
-        detected = _detect_cuda_devices()
+        detected = _detect_devices()
         resolved = detected if detected else ["cuda:0"]
     else:
         for d in device_args:
             if d == "all":
-                resolved.extend(_detect_cuda_devices() or ["cuda:0"])
+                resolved.extend(_detect_devices() or ["cuda:0"])
             else:
                 resolved.append(d)
 

@@ -103,7 +103,15 @@ def _tensor_core_gen(cc: tuple[int, int], name: str = "") -> int | None:
 
 @dataclass(frozen=True, slots=True)
 class GPUInfo:
-    """Detailed information about a single GPU device."""
+    """Detailed information about a single GPU device.
+
+    The ``backend`` field disambiguates CUDA vs MPS GPUs. Defaults to
+    ``"cuda"`` so existing pre-v1.0 callers (and tests) keep working
+    unchanged. MPS-derived ``GPUInfo`` instances populate
+    ``compute_capability=(0, 0)``, ``cuda_version=""``,
+    ``tensor_core_generation=None``, ``supports_fp8=False``,
+    ``supports_tf32=False`` and use ``architecture="Apple-Silicon"``.
+    """
 
     device_id: int
     name: str
@@ -119,6 +127,7 @@ class GPUInfo:
     supports_tf32: bool
     tensor_core_generation: int | None
     max_shared_memory_per_block: int  # bytes
+    backend: str = "cuda"  # "cuda" | "mps"
 
 
 def _detect_via_pynvml() -> list[GPUInfo] | None:

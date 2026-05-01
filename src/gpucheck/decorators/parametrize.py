@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from gpucheck.decorators.devices import _detect_cuda_devices, _is_device_available
+from gpucheck.decorators.devices import _detect_devices, _is_device_available
 from gpucheck.decorators.dtypes import DtypeArg, _dtype_id, _resolve_dtype
 from gpucheck.decorators.shapes import Shape, _shape_id
 
@@ -54,9 +54,9 @@ def parametrize_gpu(
     # Resolve dtypes
     resolved_dtypes = [_resolve_dtype(d) for d in dtypes]
 
-    # Resolve devices
+    # Resolve devices: auto-detect CUDA + MPS when caller passes ``None``.
     if devices is None:
-        detected = _detect_cuda_devices()
+        detected = _detect_devices()
         resolved_devices = detected if detected else ["cuda:0"]
     else:
         resolved_devices = list(devices)
