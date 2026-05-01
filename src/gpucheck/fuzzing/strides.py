@@ -292,7 +292,7 @@ class StrideStrategy:
 
         cats = tuple(categories) if categories else CATEGORIES
 
-        @st.composite  # type: ignore[untyped-decorator]
+        @st.composite
         def _draw(draw: Any) -> Any:
             cat = draw(st.sampled_from(cats))
             seed = draw(st.integers(min_value=0, max_value=2**31 - 1))
