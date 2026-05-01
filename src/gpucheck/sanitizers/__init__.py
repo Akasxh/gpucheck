@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from gpucheck.sanitizers.determinism import (
+    DeterminismError,
+    assert_deterministic,
+    requires_determinism,
+)
 from gpucheck.sanitizers.memory import SanitizerMemoryReport, check_memory_leaks, memory_guard
 from gpucheck.sanitizers.race import SanitizerReport, run_with_sanitizer
 
@@ -15,4 +20,7 @@ __all__ = [
     "check_memory_leaks",
     "memory_guard",
     "run_with_sanitizer",
+    "assert_deterministic",
+    "requires_determinism",
+    "DeterminismError",
 ]

@@ -11,6 +11,7 @@ _LAZY_MAP: dict[str, tuple[str, str]] = {
     "emit_github_annotations": ("gpucheck.reporting.ci", "emit_github_annotations"),
     "write_junit_xml": ("gpucheck.reporting.ci", "write_junit_xml"),
     "generate_pr_comment": ("gpucheck.reporting.ci", "generate_pr_comment"),
+    "HTMLReporter": ("gpucheck.reporting.html", "HTMLReporter"),
 }
 
 
@@ -28,4 +29,5 @@ __all__ = [
     "emit_github_annotations",
     "write_junit_xml",
     "generate_pr_comment",
+    "HTMLReporter",
 ]
