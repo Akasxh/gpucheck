@@ -9,12 +9,17 @@ Source: security-postmerge PM-4; planner T-02.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 import pytest
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 torch = pytest.importorskip("torch")
 
-from gpucheck.assertions.close import _to_numpy, assert_close
+from gpucheck.assertions.close import _to_numpy, assert_close  # noqa: E402
 
 
 # Three canonical non-contiguous stride patterns.
@@ -51,7 +56,7 @@ def _broadcast_pattern() -> torch.Tensor:
     ],
 )
 def test_to_numpy_handles_non_contiguous_input(
-    name: str, factory: "callable[[], torch.Tensor]"
+    name: str, factory: Callable[[], torch.Tensor]
 ) -> None:
     """`_to_numpy` must not raise on stride-fuzzed inputs."""
     tensor = factory()
@@ -74,7 +79,7 @@ def test_to_numpy_handles_non_contiguous_input(
     ],
 )
 def test_assert_close_handles_non_contiguous_input(
-    name: str, factory: "callable[[], torch.Tensor]"
+    name: str, factory: Callable[[], torch.Tensor]
 ) -> None:
     """End-to-end: `assert_close` should not raise RuntimeError when comparing
     non-contiguous tensors against their contiguous equivalents."""

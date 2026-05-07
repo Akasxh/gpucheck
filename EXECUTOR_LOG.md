@@ -13,4 +13,12 @@ Owner: engineering-executor (Phase A close.py collision group)
 - Test count: 224 passed, 1 skipped → 230 passed, 1 skipped (+6 new parametrized cases).
 - Lazy-import contract: re-verified PASS (no torch in sys.modules after `import gpucheck.assertions.close`).
 - New file: `tests/test_assert_close_contiguous.py`.
+- Commit SHA: 1dd7ba9.
+
+## T-10 — Pin numeric fields in mismatch report (kills ~30 mutants)
+- Test count: 230 passed, 1 skipped → 233 passed, 1 skipped (+3 new pinned-numerics tests).
+- Lazy-import contract: re-verified PASS.
+- Lint: `uv run ruff check src/ tests/` clean.
+- Type check: `uv run mypy src/` clean (Success: no issues found in 41 source files).
+- Mutmut killed (post-T-10, no full re-run): 169 (unchanged baseline; full re-run intentionally skipped per task instructions). The new tests target reporting.py mutants that are expected to flip ~30 from `survived` → `ok_killed` on the next mutmut sweep.
 - Commit SHA: pending.

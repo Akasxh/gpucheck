@@ -225,6 +225,117 @@ class TestMismatchReportFormat:
 
 
 # ---------------------------------------------------------------------------
+# format_mismatch_report — pinned numeric fields (T-10, kills ~30 mutants)
+# ---------------------------------------------------------------------------
+
+
+class TestMismatchReportPinnedNumerics:
+    """Lock down the exact numeric values reported by ``format_mismatch_report``.
+
+    These tests target ``assertions/reporting.py`` mutation survivors
+    documented in `EVIDENCE/mutator-survivors.md` top-leverage #1. Each test
+    fixes hard-coded expected values so that any arithmetic substitution
+    (e.g. ``+`` → ``-``, ``np.nanmax`` → ``np.nanmin``, ``unravel_index``
+    swap, ``mismatch_pct`` factor flip) breaks the assertion.
+    """
+
+    def test_max_abs_error_value_is_pinned(self) -> None:
+        """Max absolute error == max of element-wise |actual - expected|.
+
+        Construct ``diff = [0.5, 4.5, 1.5, 3.5]`` so the unique maximum is
+        4.5 at flat index 1. The report formats with ``{:.6e}``, yielding
+        ``"4.500000e+00"``. Any swap of ``np.nanmax`` → ``np.nanmin`` /
+        ``np.nanmean`` / sign flip in the diff computation breaks this.
+        """
+        actual = np.array([1.0, 0.5, 2.5, 0.5], dtype=np.float64)
+        expected = np.array([1.5, 5.0, 1.0, 4.0], dtype=np.float64)
+        # Element-wise |a - b| = [0.5, 4.5, 1.5, 3.5] — exact, no FP rounding.
+
+        report = format_mismatch_report(actual, expected, atol=0.0, rtol=0.0)
+
+        # Pinned: the unique maximum 4.5 is rendered as "4.500000e+00".
+        assert "4.500000e+00" in report, (
+            "Max absolute error value drifted from 4.5; "
+            "check `np.nanmax(diff)` and the `{:.6e}` formatter."
+        )
+        # Mean abs error is (0.5+4.5+1.5+3.5)/4 = 2.5 → "2.500000e+00".
+        assert "2.500000e+00" in report, (
+            "Mean absolute error value drifted from 2.5; "
+            "check `np.nanmean(diff)`."
+        )
+        # And the table label must be present (kills label-mutation survivors).
+        assert "Max absolute error" in report
+        assert "Mean absolute error" in report
+
+    def test_mismatch_count_and_location_are_pinned(self) -> None:
+        """Mismatch count, percentage, and 2-D max-error location are pinned.
+
+        With ``atol=0, rtol=0``, every element above zero diff is a
+        mismatch. The 2-D layout pins the unravel_index call: maximum is
+        at row 1, col 2.
+        """
+        actual = np.zeros((2, 3), dtype=np.float64)
+        # Place the unique maximum (5.0) at row=1, col=2.
+        expected = np.array(
+            [[1.0, 2.0, 3.0],
+             [4.0, 0.0, 5.0]],
+            dtype=np.float64,
+        )
+        # Mismatches at 5 of 6 positions (the (1, 1) zero matches).
+
+        report = format_mismatch_report(actual, expected, atol=0.0, rtol=0.0)
+
+        # 5 mismatches out of 6 total → "5 / 6 (83.33%)".
+        assert "5 / 6 (83.33%)" in report, (
+            "Mismatch count / total / pct drifted; check "
+            "`mismatch_count = int(np.sum(mismatch_mask))` and the pct factor (100.0)."
+        )
+        assert "Mismatch count" in report
+        # Location: max diff |0 - 5| = 5 sits at (1, 2). Off-by-one or axis
+        # swap in `np.unravel_index` would yield e.g. "(2, 1)" or "(0, 2)".
+        assert "(1, 2)" in report, (
+            "Location of max error is no longer (1, 2); check "
+            "`np.unravel_index(np.nanargmax(diff), diff.shape)`."
+        )
+        assert "Location of max error" in report
+        # And the max abs error itself is 5.0, formatted as "5.000000e+00".
+        assert "5.000000e+00" in report
+
+    def test_histogram_present_with_pinned_bucket_and_count(self) -> None:
+        """The error histogram appears with a known bucket label and count.
+
+        Construct 3 mismatches all with absolute error == 1e-3. log10(1e-3)
+        is -3, so the only bucket is ``[1e-3, 1e-2)`` with count 3.
+        """
+        actual = np.zeros(3, dtype=np.float64)
+        expected = np.full(3, 1e-3, dtype=np.float64)
+
+        report = format_mismatch_report(actual, expected, atol=0.0, rtol=0.0)
+
+        # Histogram panel header — kills any rename of the panel title.
+        assert "Error Histogram" in report
+        # Bucket label format `[1e{lo:+d}, 1e{hi:+d})`. Mutating `lo` or `hi`
+        # by ±1 changes the rendered label.
+        assert "[1e-3, 1e-2)" in report, (
+            "Histogram bucket label drifted; check `np.floor(np.min(log_vals))` "
+            "and `np.ceil(np.max(log_vals))`, plus the `{:+d}` format."
+        )
+        # All 3 mismatches fall into the single bucket. The histogram line
+        # formats as `[1e-3, 1e-2) | ███...███ 3`. Strip ANSI escape codes
+        # (Rich emits `\x1b[<digits>m`) and isolate the bucket line.
+        import re
+        plain_report = re.sub(r"\x1b\[[0-9;]*m", "", report)
+        tail_after_bucket = plain_report.split("[1e-3, 1e-2)")[1]
+        bucket_line_tail = tail_after_bucket.split("\n", 1)[0]
+        digits_only = "".join(ch for ch in bucket_line_tail if ch.isdigit())
+        assert digits_only == "3", (
+            "Histogram count for the [1e-3, 1e-2) bucket is no longer 3 "
+            f"(got digits={digits_only!r}); "
+            "check `np.histogram(log_vals, bins=bins)` and the bar-rendering loop."
+        )
+
+
+# ---------------------------------------------------------------------------
 # baseline_2x tolerance doubling
 # ---------------------------------------------------------------------------
 

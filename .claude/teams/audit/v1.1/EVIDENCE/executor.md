@@ -71,3 +71,41 @@ slice (`[:, ::2]`), transpose (`.t()`), and broadcast (`.expand`).
   the slow path. Existing CUDA fast-path (which bypasses `_to_numpy`)
   already handles same-shape tensors without copying, so the regression is
   bounded to mismatched / failing comparisons.
+
+## Task T-10 (Pin numeric fields in mismatch report)
+
+### What I did
+Added `TestMismatchReportPinnedNumerics` to `tests/test_assertions.py` with
+three new tests. Each test constructs simple integer-valued numpy inputs so
+expected values can be hand-computed exactly, then asserts those values
+appear verbatim (with `:.6e` formatter) in the rendered Rich report. Did
+NOT modify `src/gpucheck/assertions/reporting.py` per task instructions.
+
+### Files modified
+- `tests/test_assertions.py`: appended 3 tests targeting the ~30 surviving
+  reporting.py mutants from `EVIDENCE/mutator-survivors.md`.
+
+### Files created
+- (none)
+
+### Design decisions made during implementation
+- Used 2-D input in test 2 specifically so `np.unravel_index` is exercised
+  meaningfully (with a 1-D input, any axis-mutation would be a no-op).
+- For the histogram count assertion, stripped ANSI escape codes via
+  `re.sub(r"\x1b\[[0-9;]*m", "", report)` before scanning digits because
+  Rich's coloured output otherwise leaks digits like `33`/`31` from
+  ``\x1b[33m`` and pollutes the digit-only filter.
+- Selected unique-maximum diff values (4.5, 5.0) so the location index
+  is unambiguous — eliminating spurious passes if `nanargmax` is mutated
+  to e.g. `nanargmin` and the answer happens to coincide.
+
+### Potential blast radius
+- The histogram-count test depends on the bar-rendering loop emitting
+  the count after the bar (`f"  {bucket:>22s} | {bar} {count}"`). If the
+  format string is reordered (count before bar), the test would still
+  isolate the digits via the line-tail extraction, but the failure
+  message would be misleading. Acceptable trade-off for now.
+- `5 / 6 (83.33%)` substring is whitespace-sensitive: if the table
+  formatter switches columns or pads differently, the test could
+  false-fail. Task scope is to test current behaviour; if reporting is
+  refactored, these tests must be updated.

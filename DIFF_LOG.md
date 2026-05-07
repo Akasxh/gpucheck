@@ -20,3 +20,9 @@ Collision group: T-01 → T-02 → T-10 (serialized per skeptic C2)
 - **Change**: New parametrized test module with 6 cases pinning the contiguity fix.
 - **Reason**: T-02 acceptance demands a regression test that would fail without the `.contiguous()` insertion.
 - **Acceptance criterion addressed**: planner T-02.
+
+## Iteration 3 — Task T-10: Pin numeric fields in mismatch report
+- **File**: `tests/test_assertions.py`
+- **Change**: Added `TestMismatchReportPinnedNumerics` class with 3 tests pinning (a) max abs error / mean abs error / row labels (b) mismatch count "5 / 6 (83.33%)" + 2-D max-error location "(1, 2)" (c) histogram bucket label "[1e-3, 1e-2)" with count 3 after stripping ANSI escapes.
+- **Reason**: mutator-survivors top-leverage #1 — `assertions/reporting.py` had ~30 surviving mutants because no test asserted exact numeric values from the report. Hard-coded values + 2-D index + ANSI-aware bar count force any arithmetic substitution / unravel-axis swap / bucket-formatter mutation to fail.
+- **Acceptance criterion addressed**: planner T-10 / mutator-survivors top-leverage #1 — adds 3 tests (commit-message claim) without modifying `reporting.py` source.
