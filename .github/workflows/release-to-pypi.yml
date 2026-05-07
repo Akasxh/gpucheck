@@ -1,0 +1,82 @@
+# Release to PyPI via Trusted Publisher (OIDC, no secrets).
+#
+# Triggers on tag push matching v*.
+# Requires: PyPI project trusted publisher configured for this repo + workflow.
+# See https://docs.pypi.org/trusted-publishers/
+#
+# One-time setup (human, ~5 min on PyPI):
+#   1. https://pypi.org/manage/project/gpucheck/settings/publishing/
+#   2. Add GitHub publisher: owner=Akasxh, repo=gpucheck, workflow=release-to-pypi.yml, env=pypi
+#
+# Once configured, every `git push origin v*` triggers a publish.
+
+name: Release to PyPI
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g., v1.0.0)"
+        required: true
+
+permissions:
+  contents: read
+  id-token: write   # OIDC for Trusted Publisher
+
+jobs:
+  build:
+    name: Build wheel + sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv + build
+        run: |
+          pip install uv build twine
+          uv --version
+          python -m build --version
+
+      - name: Build distributions
+        run: python -m build
+
+      - name: Twine check
+        run: twine check dist/*
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/gpucheck
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish via Trusted Publisher (OIDC)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # No password/token needed — OIDC handles auth.
+          packages-dir: dist/
+          skip-existing: false
+          verbose: true
