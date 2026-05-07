@@ -7,6 +7,14 @@ from typing import Any
 
 from gpucheck.fuzzing.inputs import edge_inputs, mixed_inputs, random_inputs
 from gpucheck.fuzzing.shapes import ShapeStrategy, fuzz_shapes
+from gpucheck.fuzzing.strides import (
+    CATEGORIES as STRIDE_CATEGORIES,
+)
+from gpucheck.fuzzing.strides import (
+    StrideStrategy,
+    fuzz_strides,
+    fuzz_strides_for_category,
+)
 
 _LAZY_MAP: dict[str, tuple[str, str]] = {
     "gpu_shapes": ("gpucheck.fuzzing.strategies", "gpu_shapes"),
@@ -30,4 +38,8 @@ __all__ = [
     "ShapeStrategy",
     "gpu_shapes",
     "gpu_tensors",
+    "fuzz_strides",
+    "fuzz_strides_for_category",
+    "StrideStrategy",
+    "STRIDE_CATEGORIES",
 ]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import Any
 
 import pytest
@@ -47,6 +48,57 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line("markers", "gpu: marks tests requiring a GPU")
     config.addinivalue_line("markers", "slow: marks slow-running tests")
     config.addinivalue_line("markers", "multi_gpu: marks tests requiring multiple GPUs")
+    config.addinivalue_line("markers", "mps: marks tests requiring Apple Silicon MPS")
+
+    # Load tolerances + MPS xfail registry from pyproject.toml at session start.
+    _load_pyproject_config(config.rootpath)
+
+
+def _load_pyproject_config(rootpath: Any) -> None:
+    """Read ``pyproject.toml`` and apply gpucheck's tool sections.
+
+    Best-effort — if the file is absent gpucheck falls back to its built-in
+    defaults. If the file exists but is unreadable or malformed, a
+    :class:`UserWarning` is emitted so the user sees the misconfiguration
+    rather than silently shipping defaults (security finding PM-2).
+
+    Uses stdlib ``tomllib`` (Python 3.11+) or ``tomli`` (3.10) — both ship with
+    the python toolchain we target.
+    """
+    from pathlib import Path as _Path
+
+    pyproject = _Path(str(rootpath)) / "pyproject.toml"
+    if not pyproject.is_file():
+        return
+
+    # Python 3.11+ ships tomllib in the stdlib; 3.10 needs `tomli`.
+    # Both modules import as a name local to this function — mypy's
+    # static view doesn't know which Python we'll actually run on, so
+    # the import errors are silenced via the broad mypy override below.
+    try:
+        import tomllib
+    except ModuleNotFoundError:  # pragma: no cover  -- 3.10 fallback
+        import tomli as tomllib  # type: ignore[no-redef,unused-ignore]
+
+    try:
+        with pyproject.open("rb") as f:
+            data = tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        warnings.warn(
+            f"gpucheck: failed to load {pyproject} ({type(exc).__name__}: {exc}); "
+            "falling back to built-in tolerance defaults.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return
+
+    from gpucheck.assertions.tolerances import (
+        apply_config_tolerances,
+        apply_mps_xfail_config,
+    )
+
+    apply_config_tolerances(data)
+    apply_mps_xfail_config(data)
 
 
 def pytest_collection_modifyitems(

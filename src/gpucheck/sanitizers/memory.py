@@ -138,9 +138,46 @@ def check_memory_leaks(
     )
 
 
+@dataclass(slots=True)
+class MemoryGuardReport:
+    """Public report yielded by :func:`memory_guard`.
+
+    Populated after the ``with`` block exits. Distinct from
+    :class:`gpucheck.fixtures.profiler.MemoryReport` (which is a *frozen*
+    fixture-side summary) because the guard pattern requires a placeholder
+    that the context manager can fill on exit.
+    """
+
+    leaked_bytes: int = 0
+    peak_bytes: int = 0
+    allocations: int = 0
+    deallocations: int = 0
+
+    @property
+    def leaked_mb(self) -> float:
+        return self.leaked_bytes / (1024 * 1024)
+
+    @property
+    def peak_mb(self) -> float:
+        return self.peak_bytes / (1024 * 1024)
+
+    @property
+    def has_leak(self) -> bool:
+        return self.leaked_bytes > 0
+
+    def to_report(self) -> SanitizerMemoryReport:
+        """Return a frozen :class:`SanitizerMemoryReport` snapshot."""
+        return SanitizerMemoryReport(
+            leaked_bytes=self.leaked_bytes,
+            peak_bytes=self.peak_bytes,
+            allocations=self.allocations,
+            deallocations=self.deallocations,
+        )
+
+
 @contextmanager
-def memory_guard(threshold_bytes: int = 0) -> Generator[_MutableReport, None, None]:
-    """Context manager that tracks GPU memory and yields a :class:`SanitizerMemoryReport`.
+def memory_guard(threshold_bytes: int = 0) -> Generator[MemoryGuardReport, None, None]:
+    """Context manager that tracks GPU memory and yields a :class:`MemoryGuardReport`.
 
     Usage::
 
@@ -161,7 +198,8 @@ def memory_guard(threshold_bytes: int = 0) -> Generator[_MutableReport, None, No
     except ImportError:
         pass
 
-    # Use a mutable wrapper so the caller can inspect the report after the block.
+    # Track the entry-side state in a local dict so the report can be filled
+    # in after the user's ``with`` block runs.
     _holder: dict[str, Any] = {}
 
     if torch_available:
@@ -175,9 +213,8 @@ def memory_guard(threshold_bytes: int = 0) -> Generator[_MutableReport, None, No
     else:
         _holder["before"] = _get_pynvml_memory()
 
-    # Yield a _MutableReport so caller can inspect after block
-    mut = _MutableReport()
-    yield mut
+    report = MemoryGuardReport()
+    yield report
 
     _sync_and_gc()
 
@@ -191,68 +228,19 @@ def memory_guard(threshold_bytes: int = 0) -> Generator[_MutableReport, None, No
         alloc_after = stats_after.get("allocation.all.current", 0)
         free_count = stats_after.get("free.all.current", 0)
 
-        mut._fill(
-            leaked_bytes=max(0, after - _holder["before"]),
-            peak_bytes=peak,
-            allocations=max(0, alloc_after - alloc_before),
-            deallocations=free_count,
-        )
+        report.leaked_bytes = max(0, after - _holder["before"])
+        report.peak_bytes = peak
+        report.allocations = max(0, alloc_after - alloc_before)
+        report.deallocations = free_count
     else:
         after = _get_pynvml_memory()
-        mut._fill(
-            leaked_bytes=max(0, after - _holder["before"]),
-            peak_bytes=max(_holder["before"], after),
-            allocations=0,
-            deallocations=0,
-        )
+        report.leaked_bytes = max(0, after - _holder["before"])
+        report.peak_bytes = max(_holder["before"], after)
+        report.allocations = 0
+        report.deallocations = 0
 
-    if threshold_bytes > 0 and mut.leaked_bytes > threshold_bytes:
+    if threshold_bytes > 0 and report.leaked_bytes > threshold_bytes:
         raise RuntimeError(
-            f"GPU memory leak detected: {mut.leaked_bytes} bytes "
+            f"GPU memory leak detected: {report.leaked_bytes} bytes "
             f"(threshold: {threshold_bytes})"
-        )
-
-
-class _MutableReport:
-    """Mutable stand-in for :class:`SanitizerMemoryReport`, filled after context exit."""
-
-    __slots__ = ("leaked_bytes", "peak_bytes", "allocations", "deallocations")
-
-    def __init__(self) -> None:
-        self.leaked_bytes: int = 0
-        self.peak_bytes: int = 0
-        self.allocations: int = 0
-        self.deallocations: int = 0
-
-    def _fill(
-        self,
-        *,
-        leaked_bytes: int,
-        peak_bytes: int,
-        allocations: int,
-        deallocations: int,
-    ) -> None:
-        self.leaked_bytes = leaked_bytes
-        self.peak_bytes = peak_bytes
-        self.allocations = allocations
-        self.deallocations = deallocations
-
-    @property
-    def leaked_mb(self) -> float:
-        return self.leaked_bytes / (1024 * 1024)
-
-    @property
-    def peak_mb(self) -> float:
-        return self.peak_bytes / (1024 * 1024)
-
-    @property
-    def has_leak(self) -> bool:
-        return self.leaked_bytes > 0
-
-    def to_report(self) -> SanitizerMemoryReport:
-        return SanitizerMemoryReport(
-            leaked_bytes=self.leaked_bytes,
-            peak_bytes=self.peak_bytes,
-            allocations=self.allocations,
-            deallocations=self.deallocations,
         )

@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gpucheck"
-version = "0.1.0"
-description = "pytest for GPU kernels — correctness, benchmarking, and fuzzing for CUDA and Triton"
+version = "1.0.0rc1"
+description = "pytest for GPU kernels — correctness, benchmarking, and fuzzing for CUDA, MPS, and Triton"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
@@ -31,10 +31,21 @@ dependencies = [
     "pytest>=7.0",
     "rich>=13.0",
     "numpy>=1.24",
+    # Python 3.10 lacks `tomllib` in the stdlib; the plugin's
+    # `_load_pyproject_config` falls back to `tomli`. Without this declared
+    # dependency, a fresh `pip install gpucheck` on 3.10 silently no-ops the
+    # `[tool.gpucheck.tolerances]` and `[tool.gpucheck.mps.xfail]` overlays
+    # (review BLOCKER S1; configuration-trust failure).
+    'tomli>=2.0; python_version < "3.11"',
 ]
 
 [project.optional-dependencies]
 torch = ["torch>=2.0"]
+# Apple Silicon MPS backend. torch>=2.6 is the floor where
+# torch.mps.synchronize() is stable enough for gpucheck's deadlock-safe
+# benchmark path (research SYNTHESIS §3, pytorch#162872 context).
+mps = ["torch>=2.6"]
+apple = ["gpucheck[mps]"]
 cupy = ["cupy-cuda12x>=13.0"]
 triton = ["triton>=3.0"]
 hypothesis = ["hypothesis>=6.0", "hypothesis[numpy]"]
@@ -81,5 +92,50 @@ warn_return_any = true
 warn_unused_configs = true
 
 [[tool.mypy.overrides]]
-module = ["pynvml", "pynvml.*", "torch", "torch.*", "triton", "triton.*", "cupy", "cupy.*", "hypothesis", "hypothesis.*"]
+module = ["pynvml", "pynvml.*", "torch", "torch.*", "triton", "triton.*", "cupy", "cupy.*", "hypothesis", "hypothesis.*", "psutil", "psutil.*", "tomllib", "tomli"]
 ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+# gpucheck — MPS xfail registry (research SYNTHESIS §2 + §7)
+# ---------------------------------------------------------------------------
+#
+# This block is the LIVING DOCUMENT of known-broken kernels on Apple Silicon
+# MPS. It is parsed by `gpucheck.assertions.apply_mps_xfail_config` and
+# exposed via `gpucheck.is_mps_xfailed("op.subcategory")`. Tolerance
+# multipliers cannot rescue these failures — they are silent-correctness or
+# crash bugs in PyTorch's MPS backend.
+#
+# Re-mine the issue tracker each minor release; bugs that close should be
+# removed, and new ones added.
+[tool.gpucheck.mps.xfail]
+ops = [
+  # SDPA correctness on large B×S — pytorch#179352
+  "scaled_dot_product_attention.large",
+  # SDPA backward goes through the math-decomposition backend — pytorch#179294
+  "scaled_dot_product_attention.backward",
+  # layer_norm backward at shape (1,) — pytorch#173525
+  "layer_norm.backward.shape1",
+  # BatchNorm2d backward, channels_last input, ~7-OOM-wrong grads — pytorch#175189
+  "batch_norm.backward.channels_last",
+  # conv2d C_out > 65536 returns zeros — pytorch#142836
+  "conv2d.large_channels",
+  # conv2d backward returns wrong memory format — pytorch#174269
+  "conv2d.backward.channels_last_format",
+  # F.linear backward, BF16/FP16, no-bias, >2D, run-to-run divergence on M5 — pytorch#181936
+  "F.linear.backward.bf16_3d_nobias_m5",
+  # softmax NaN at >10000 in last 2 dims — pytorch#96602
+  "softmax.large_attention",
+  # AvgPool2d backward, channels_last, SIGABRT — pytorch#175190
+  "avg_pool2d.backward.channels_last",
+  # Binary ops on uint16/uint32/uint64 return garbage — pytorch#176296
+  "binary_ops.uint16_uint32_uint64",
+  # BCE loss broken since 2024 — pytorch#137001
+  "BCE_loss",
+  # Catastrophic gradient corruption when total elements > 32K — pytorch#177116
+  "matmul.backward.over_32K_elements",
+]
+
+[tool.mutmut]
+paths_to_mutate = "src/gpucheck/"
+runner = "uv run pytest -x -q"
+tests_dir = "tests/"

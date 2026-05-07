@@ -2,17 +2,31 @@
 
 from __future__ import annotations
 
-from gpucheck.sanitizers.memory import SanitizerMemoryReport, check_memory_leaks, memory_guard
+from gpucheck.sanitizers.determinism import (
+    DeterminismError,
+    assert_deterministic,
+    requires_determinism,
+)
+from gpucheck.sanitizers.memory import (
+    MemoryGuardReport,
+    SanitizerMemoryReport,
+    check_memory_leaks,
+    memory_guard,
+)
 from gpucheck.sanitizers.race import SanitizerReport, run_with_sanitizer
 
 # Backward-compat alias
 MemoryReport = SanitizerMemoryReport
 
 __all__ = [
+    "MemoryGuardReport",
     "MemoryReport",
     "SanitizerMemoryReport",
     "SanitizerReport",
     "check_memory_leaks",
     "memory_guard",
     "run_with_sanitizer",
+    "assert_deterministic",
+    "requires_determinism",
+    "DeterminismError",
 ]

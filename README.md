@@ -7,9 +7,11 @@
 [![License](https://img.shields.io/github/license/Akasxh/gpucheck)](https://github.com/Akasxh/gpucheck/blob/main/LICENSE)
 [![CI](https://github.com/Akasxh/gpucheck/actions/workflows/ci.yml/badge.svg)](https://github.com/Akasxh/gpucheck/actions/workflows/ci.yml)
 
-GPU kernel testing is painful. You write a CUDA kernel, eyeball `torch.allclose` with magic tolerances, and pray it works on a different GPU architecture. gpucheck is a pytest plugin that gives you dtype-aware assertions, parametric testing across dtypes/shapes/devices, CUDA-event benchmarking, shape fuzzing, and memory leak detection -- all from decorators and fixtures you already know how to use.
+GPU kernel testing is painful. You write a CUDA or Metal kernel, eyeball `torch.allclose` with magic tolerances, and pray it works on a different GPU architecture. gpucheck is a pytest plugin that gives you dtype-aware assertions, parametric testing across dtypes/shapes/devices, GPU-event benchmarking, shape and stride fuzzing, and memory leak detection -- all from decorators and fixtures you already know how to use. **CUDA + Apple MPS** are first-class.
 
-We tested gpucheck against Triton tutorials and PyTorch CUDA ops with **511 test configurations** and found **8 real bugs**, including a **83% error in Triton's layer norm** for non-power-of-2 dimensions ([triton#9838](https://github.com/triton-lang/triton/issues/9838)) and **FP16 accumulation drift in the tutorial matmul** ([triton#9839](https://github.com/triton-lang/triton/issues/9839)).
+We tested gpucheck against Triton tutorials and PyTorch CUDA ops with **511 test configurations** and surfaced **8 bugs**, **2 of which are externally filed and verified** upstream: a **83% error in Triton's layer norm** for non-power-of-2 dimensions ([triton#9838](https://github.com/triton-lang/triton/issues/9838), open) and **FP16 accumulation drift in the tutorial matmul** ([triton#9839](https://github.com/triton-lang/triton/issues/9839), closed). The remaining 6 are internal-ledger findings reproducible from `examples/`.<sup>[1](#fn-bug-count)</sup>
+
+> **What's new in v1.0** — Apple Silicon MPS backend, stride/contiguity fuzzing, thread-safe tolerance overrides, HTML dashboard, determinism sanitizer, committed `uv.lock`. See [`CHANGELOG.md`](./CHANGELOG.md) for the full release notes and [`MIGRATION.md`](./MIGRATION.md) for the v0 → v1 upgrade guide.
 
 ```python
 import torch
@@ -38,7 +40,8 @@ Optional dependencies for specific backends:
 
 ```bash
 pip install gpucheck[torch]       # PyTorch + CUDA
-pip install gpucheck[hypothesis]  # Property-based shape fuzzing
+pip install gpucheck[mps]         # Apple Silicon (Metal Performance Shaders); pins torch>=2.6
+pip install gpucheck[hypothesis]  # Property-based shape, tensor, and stride fuzzing
 pip install gpucheck[all]         # Everything
 ```
 
@@ -335,6 +338,8 @@ gpucheck's shape fuzzing and dtype-aware testing found these real bugs in widely
 
 Most of these bugs were caught by non-power-of-2 shapes -- dimensions like 17, 127, 255 that hit tile boundary edge cases. This is exactly what `fuzz_shapes()` generates.
 
+The table lists 5 of the 8 surfaced bugs in detail. The first two (`triton#9838`, `triton#9839`) are filed upstream and externally verified. The remaining 3 in the "8 bugs surfaced" total are internal-ledger findings not yet detailed in this table; reproducers live alongside the two examples below.
+
 See [`examples/triton_layernorm_bug.py`](examples/triton_layernorm_bug.py) and [`examples/triton_matmul_bug.py`](examples/triton_matmul_bug.py) for standalone reproducers.
 
 ## Tested hardware and software
@@ -364,7 +369,8 @@ gpucheck has been validated on the following hardware and software stack:
 
 **What is not yet tested on physical hardware:**
 - Ampere (A100, RTX 30xx), Ada (L40, RTX 40xx), Hopper (H100), and Blackwell GPUs are supported in the architecture detection and gating code but have only been tested via mocked GPU info, not on actual hardware. The tolerance model for these architectures is calibrated against published CUTLASS and cuBLAS error models.
-- AMD ROCm and Intel XPU are not supported yet. The architecture detection module is NVIDIA-only for now. ROCm support is planned and would involve adding HIP detection via `torch.version.hip` and AMD GPU enumeration via `amdsmi` or `rocm_smi`. Intel XPU support would use `torch.xpu`.
+- Apple Silicon is **supported via MPS as of v1.0** (see `gpucheck.backends.MPSBackend`, `@devices("mps")`, and the `[tool.gpucheck.mps.xfail]` config block). The 2× MPS tolerance multiplier is PROVISIONAL pending P99 calibration on M-machine — see [`CHANGELOG.md`](./CHANGELOG.md) and [`MIGRATION.md`](./MIGRATION.md) §6.
+- AMD ROCm and Intel XPU are not supported yet. ROCm support would involve adding HIP detection via `torch.version.hip` and AMD GPU enumeration via `amdsmi` or `rocm_smi`. Intel XPU support would use `torch.xpu`.
 - Google TPU is not in scope for this project since TPUs use a fundamentally different programming model (XLA) that does not map to the kernel-level testing gpucheck provides.
 
 ## Comparison
@@ -458,3 +464,8 @@ pytest examples/benchmark_example.py -v
 ## License
 
 Apache-2.0
+
+---
+
+<a id="fn-bug-count"></a>
+**[1]** "8 bugs / 2 externally verified" reconciles the prior README lead-claim with the visible "Bugs found" table. Source: `.claude/teams/research/v1.0/SYNTHESIS.md` §Sub-Q 8 (research team's archaeologist + empiricist evidence). The 2 externally verified bugs are `triton#9838` (open) and `triton#9839` (closed), both confirmed by upstream issue tracker as of 2026-05-01.

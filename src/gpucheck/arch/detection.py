@@ -103,7 +103,15 @@ def _tensor_core_gen(cc: tuple[int, int], name: str = "") -> int | None:
 
 @dataclass(frozen=True, slots=True)
 class GPUInfo:
-    """Detailed information about a single GPU device."""
+    """Detailed information about a single GPU device.
+
+    The ``backend`` field disambiguates CUDA vs MPS GPUs. Defaults to
+    ``"cuda"`` so existing pre-v1.0 callers (and tests) keep working
+    unchanged. MPS-derived ``GPUInfo`` instances populate
+    ``compute_capability=(0, 0)``, ``cuda_version=""``,
+    ``tensor_core_generation=None``, ``supports_fp8=False``,
+    ``supports_tf32=False`` and use ``architecture="Apple-Silicon"``.
+    """
 
     device_id: int
     name: str
@@ -119,6 +127,7 @@ class GPUInfo:
     supports_tf32: bool
     tensor_core_generation: int | None
     max_shared_memory_per_block: int  # bytes
+    backend: str = "cuda"  # "cuda" | "mps"
 
 
 def _detect_via_pynvml() -> list[GPUInfo] | None:
@@ -145,7 +154,8 @@ def _detect_via_pynvml() -> list[GPUInfo] | None:
             cuda_major = cuda_ver_int // 1000
             cuda_minor = (cuda_ver_int % 1000) // 10
             cuda_version = f"{cuda_major}.{cuda_minor}"
-        except Exception:
+        except (pynvml.NVMLError, AttributeError) as exc:
+            logger.debug("pynvml CUDA driver version probe failed: %s", exc)
             cuda_version = ""
 
         device_count = pynvml.nvmlDeviceGetCount()
@@ -217,7 +227,8 @@ def _detect_via_torch() -> list[GPUInfo] | None:
             torch.cuda.set_device(i)
             free_bytes, _total = torch.cuda.mem_get_info(i)
             free_mb = free_bytes // (1024 * 1024)
-        except Exception:
+        except (RuntimeError, AttributeError) as exc:
+            logger.debug("torch.cuda.mem_get_info(%d) failed: %s; using total as free", i, exc)
             free_mb = total_mb  # best guess
 
         if hasattr(props, "max_shared_memory_per_block"):
@@ -256,13 +267,17 @@ def _default_shared_memory(cc: tuple[int, int]) -> int:
     return 48 * 1024  # pre-Volta
 
 
-@lru_cache(maxsize=1)
-def detect_gpus() -> list[GPUInfo]:
-    """Detect all available GPUs and return their info.
+def _detect_gpus_or_warn() -> list[GPUInfo] | None:
+    """Single source of truth for GPU detection (T-20).
 
-    Uses pynvml as the primary backend (no torch import needed).
-    Falls back to torch.cuda if pynvml is unavailable.
-    Result is cached for the session lifetime.
+    Tries pynvml first, then ``torch.cuda``; returns the first non-None
+    result. Returns ``None`` only when no detection backend is importable —
+    in that case a one-shot UserWarning is emitted so callers in either
+    ``arch/detection.detect_gpus`` or ``fixtures/gpu.detect_gpu`` can
+    decide whether to map ``None`` to an empty list or to ``None``.
+
+    A backend that imports but reports zero GPUs returns ``[]`` (truthy
+    Python-False but distinct from ``None``).
     """
     gpus = _detect_via_pynvml()
     if gpus is not None:
@@ -280,4 +295,16 @@ def detect_gpus() -> list[GPUInfo]:
         "No GPU detection backend available. Install pynvml or torch for GPU support.",
         stacklevel=2,
     )
-    return []
+    return None
+
+
+@lru_cache(maxsize=1)
+def detect_gpus() -> list[GPUInfo]:
+    """Detect all available GPUs and return their info.
+
+    Uses pynvml as the primary backend (no torch import needed).
+    Falls back to torch.cuda if pynvml is unavailable.
+    Result is cached for the session lifetime.
+    """
+    gpus = _detect_gpus_or_warn()
+    return [] if gpus is None else gpus

@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -16,6 +17,17 @@ if TYPE_CHECKING:
 
 SanitizerTool = Literal["memcheck", "racecheck", "initcheck", "synccheck"]
 _VALID_TOOLS: frozenset[str] = frozenset({"memcheck", "racecheck", "initcheck", "synccheck"})
+
+# Allowlist of canonical CUDA install prefixes. ``CUDA_HOME`` / ``CUDA_PATH``
+# values are normalized via ``os.path.realpath`` and rejected if they
+# resolve outside this set. Mitigates security finding TM-E1: an attacker
+# who can set the env var should not be able to redirect gpucheck into
+# executing an arbitrary binary named ``compute-sanitizer``.
+_CUDA_HOME_ALLOWLIST: tuple[str, ...] = (
+    "/usr/local/cuda",
+    "/opt/nvidia/cuda",
+    "/opt/cuda",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,18 +60,53 @@ class SanitizerReport:
 
 
 def _find_compute_sanitizer() -> str | None:
-    """Locate compute-sanitizer binary on PATH or in CUDA_HOME."""
+    """Locate compute-sanitizer binary on PATH or in CUDA_HOME.
+
+    ``CUDA_HOME`` / ``CUDA_PATH`` env vars are normalized via
+    ``os.path.realpath`` and validated against
+    :data:`_CUDA_HOME_ALLOWLIST` before being trusted. Mitigates security
+    finding TM-E1.
+    """
     path = shutil.which("compute-sanitizer")
     if path:
         return path
 
     cuda_home = os.environ.get("CUDA_HOME") or os.environ.get("CUDA_PATH", "")
-    if cuda_home:
-        candidate = os.path.join(cuda_home, "bin", "compute-sanitizer")
-        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-            return candidate
+    if not cuda_home:
+        return None
+
+    # Resolve symlinks so an attacker can't bypass the allowlist by
+    # planting a symlink that points outside the trusted prefixes.
+    real = os.path.realpath(cuda_home)
+    if not _is_allowed_cuda_home(real):
+        warnings.warn(
+            f"CUDA_HOME / CUDA_PATH={cuda_home!r} resolves to {real!r} which is "
+            f"outside the allowlist {_CUDA_HOME_ALLOWLIST!r}; ignoring "
+            f"(set CUDA_HOME to a path under one of those prefixes, or "
+            f"install compute-sanitizer onto PATH).",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return None
+
+    candidate = os.path.join(real, "bin", "compute-sanitizer")
+    if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+        return candidate
 
     return None
+
+
+def _is_allowed_cuda_home(real_path: str) -> bool:
+    """Return ``True`` if *real_path* is inside one of the allowlist prefixes.
+
+    The check is exact-prefix-with-separator so ``/usr/local/cuda-evil``
+    does NOT match ``/usr/local/cuda``.
+    """
+    norm = os.path.normpath(real_path)
+    for prefix in _CUDA_HOME_ALLOWLIST:
+        if norm == prefix or norm.startswith(prefix + os.sep):
+            return True
+    return False
 
 
 def _parse_sanitizer_output(

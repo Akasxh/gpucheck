@@ -10,13 +10,29 @@ import numpy.typing as npt
 from gpucheck.assertions.reporting import format_mismatch_report
 from gpucheck.assertions.tolerances import compute_tolerance
 
-try:
-    import torch as _torch
+# Cached lazy-imported torch module (None if not installed).
+# Module-level cache; sentinel `_TORCH_UNRESOLVED` distinguishes "not yet looked
+# up" from "looked up and absent" so the lookup happens at most once.
+_TORCH_UNRESOLVED: Any = object()
+_torch_cached: Any = _TORCH_UNRESOLVED
 
-    _has_torch = True
-except ImportError:
-    _torch = None  # type: ignore[assignment]
-    _has_torch = False
+
+def _torch_mod() -> Any:
+    """Lazy-import torch and cache the module (or ``None`` if unavailable).
+
+    CLAUDE.md mandates that torch is never imported at collection / import
+    time — only when an API actually needs it.  This helper is the single
+    point of access; every call site goes through it.
+    """
+    global _torch_cached
+    if _torch_cached is _TORCH_UNRESOLVED:
+        try:
+            import torch as _t
+        except ImportError:
+            _torch_cached = None
+        else:
+            _torch_cached = _t
+    return _torch_cached
 
 
 def _to_numpy(tensor: Any) -> npt.NDArray[Any]:
@@ -26,7 +42,10 @@ def _to_numpy(tensor: Any) -> npt.NDArray[Any]:
 
     # torch.Tensor
     if hasattr(tensor, "detach"):
-        t = tensor.detach().cpu()
+        # `.contiguous()` is required on torch <2.1 to avoid RuntimeError on
+        # stride-fuzzed / sliced / transposed inputs when calling `.numpy()`.
+        # Preventive on newer torch — known to fire on older PyTorch (PM-4).
+        t = tensor.detach().cpu().contiguous()
         # Preserve float64 precision; only cast non-numpy-compatible dtypes
         if t.is_floating_point():
             if t.dtype.itemsize >= 8:
@@ -53,7 +72,7 @@ def _to_numpy(tensor: Any) -> npt.NDArray[Any]:
         try:
             import torch
 
-            t = torch.as_tensor(tensor).detach().cpu()
+            t = torch.as_tensor(tensor).detach().cpu().contiguous()
             if t.is_floating_point():
                 if t.dtype.itemsize >= 8:
                     return t.double().numpy()
@@ -139,33 +158,40 @@ def assert_close(
     """
     dtype = _resolve_dtype(actual, expected)
 
-    # --- Compute effective tolerances up-front (needed by both paths) ---
-    if baseline_2x and atol is None and rtol is None:
-        # FlashAttention 2x: double base tolerance BEFORE k_dim scaling
-        base_atol, base_rtol = compute_tolerance(dtype)
-        doubled_atol, doubled_rtol = base_atol * 2.0, base_rtol * 2.0
-        # Now apply k_dim scaling on the doubled base
-        if k_dim is not None and k_dim > 0:
-            import math
+    # --- Resolve device type so MPS gets the PROVISIONAL 2x tolerance overlay ---
+    # SYNTHESIS §7: MPS multipliers are PROVISIONAL until calibrated on
+    # M-silicon; numbers may inflate post-calibration.
+    device_type: str | None = None
+    _torch = _torch_mod()
+    if _torch is not None:
+        for t in (actual, expected):
+            if isinstance(t, _torch.Tensor):
+                device_type = t.device.type
+                break
 
-            doubled_atol *= math.sqrt(k_dim)
-        eff_atol = doubled_atol
-        eff_rtol = doubled_rtol
-    else:
-        default_atol, default_rtol = compute_tolerance(dtype, k_dim=k_dim)
-        eff_atol = atol if atol is not None else default_atol
-        eff_rtol = rtol if rtol is not None else default_rtol
-        if baseline_2x:
-            eff_atol *= 2.0
-            eff_rtol *= 2.0
+    # --- Compute effective tolerances up-front (needed by both paths) ---
+    # Canonical k_dim scaling lives in :func:`compute_tolerance`
+    # (``sqrt(max(k_dim, 1) / 128)``). The baseline_2x knob multiplies the
+    # canonical-scaled tolerance by 2 — it must NOT re-derive its own
+    # k_dim scale, or the two code paths diverge by a factor of
+    # ``sqrt(128) ≈ 11x`` at large k_dim (review BLOCKER N1).
+    base_atol, base_rtol = compute_tolerance(
+        dtype, k_dim=k_dim, device_type=device_type,
+    )
+    eff_atol = atol if atol is not None else base_atol
+    eff_rtol = rtol if rtol is not None else base_rtol
+    if baseline_2x:
+        eff_atol *= 2.0
+        eff_rtol *= 2.0
 
     # --- GPU fast-path: avoid CPU transfer when tensors match ---
+    # Widened to MPS in v1.0; torch.allclose is device-agnostic.
     if (
-        _has_torch
+        _torch is not None
         and isinstance(actual, _torch.Tensor)
         and isinstance(expected, _torch.Tensor)
         and actual.device == expected.device
-        and actual.device.type == "cuda"
+        and actual.device.type in ("cuda", "mps")
         and actual.shape == expected.shape
     ):
         try:
@@ -173,7 +199,7 @@ def assert_close(
                 return  # PASS — no CPU transfer needed
         except RuntimeError as exc:
             if "allclose" not in str(exc).lower() and "match" not in str(exc).lower():
-                raise  # Re-raise genuine CUDA errors
+                raise  # Re-raise genuine CUDA / MPS errors
 
     # --- Slow path: rich error reporting via numpy ---
     actual_np = _to_numpy(actual)
