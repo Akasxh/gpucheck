@@ -55,12 +55,16 @@ def _get_primary_gpu() -> GPUInfo | None:
     return gpus[0] if gpus else None
 
 
-def require_arch(*archs: str) -> Callable[..., Any]:
+def requires_arch(*archs: str) -> Callable[..., Any]:
     """Decorator: skip test if GPU architecture doesn't match any of the given names.
+
+    Canonical (plural) name. The singular ``require_arch`` is a
+    deprecated alias kept for v1.0 backward compatibility; it will be
+    removed in v1.2.
 
     Usage::
 
-        @require_arch("Ampere", "Hopper")
+        @requires_arch("Ampere", "Hopper")
         def test_something():
             ...
     """
@@ -90,6 +94,30 @@ def require_arch(*archs: str) -> Callable[..., Any]:
         return wrapper
 
     return decorator
+
+
+def require_arch(*archs: str) -> Callable[..., Any]:
+    """Deprecated singular alias of :func:`requires_arch`.
+
+    The original v1.0 spelling. Inconsistent with the plural
+    ``requires_determinism``; v1.1 introduces ``requires_arch`` as the
+    canonical name and v1.2 will remove this singular form. Calling this
+    decorator factory emits a :class:`DeprecationWarning`.
+
+    Usage (deprecated, use ``requires_arch`` instead)::
+
+        @require_arch("Ampere", "Hopper")
+        def test_something():
+            ...
+    """
+    warnings.warn(
+        "@require_arch (singular) is deprecated and will be removed in "
+        "v1.2; use @requires_arch (plural) for naming consistency with "
+        "@requires_determinism.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return requires_arch(*archs)
 
 
 def require_capability(major: int, minor: int = 0) -> Callable[..., Any]:

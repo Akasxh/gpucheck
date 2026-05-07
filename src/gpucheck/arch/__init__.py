@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from gpucheck.arch.compatibility import require_arch, require_capability
+from gpucheck.arch.compatibility import (
+    require_arch,
+    require_capability,
+    requires_arch,
+)
 from gpucheck.arch.detection import GPUInfo, detect_gpus
 from gpucheck.arch.tensor_cores import supports_tensor_cores, warn_tensor_core_fallback
 
@@ -29,8 +33,13 @@ __all__ = [
     "detect_gpus",
     "gpu_available",
     "gpu_count",
+    # @requires_arch is the canonical (plural) form, consistent with
+    # @requires_determinism. @require_arch is the deprecated singular
+    # alias kept for v1.0 backward compatibility; it emits a
+    # DeprecationWarning and will be removed in v1.2.
     "require_arch",
     "require_capability",
+    "requires_arch",
     "supports_tensor_cores",
     "warn_tensor_core_fallback",
 ]

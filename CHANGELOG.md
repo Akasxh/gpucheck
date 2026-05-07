@@ -12,11 +12,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- *(reserved for post-1.0 work)*
+- **`@requires_arch` decorator (T-21).** Plural-form alias of
+  `@require_arch`, matching the existing `@requires_determinism`
+  spelling. Importable from `gpucheck.arch` (or
+  `gpucheck.arch.compatibility`). The new name is the canonical form
+  going forward.
 
 ### Changed
 
 - *(reserved for post-1.0 work)*
+
+### Deprecated
+
+- **`@require_arch` (singular) is deprecated.** It now emits a
+  `DeprecationWarning` on use and will be removed in v1.2. Migrate
+  existing call sites to `@requires_arch` (plural). The deprecation
+  exists to make decorator naming consistent with
+  `@requires_determinism`; both decorators can now be searched as
+  `requires_*` in your codebase.
 
 ### Fixed
 
