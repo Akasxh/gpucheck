@@ -32,6 +32,15 @@ _DEFAULT_TOLERANCES: dict[str, tuple[float, float]] = {
 # calibrated on Akash's actual M-generation hardware before being canonical
 # (sub-Q 7 § "Calibration plan"). Until then, treat as a directional overlay.
 # 2× is the FlashAttention precedent (assertions/close.py:117 baseline_2x).
+#
+# v1.1 calibration data on Apple M5 (5K samples × 21 cells, 2026-05-07) is
+# captured at `.claude/teams/audit/v1.1/drift_histogram_5k.json` and analysed
+# in `.claude/teams/audit/v1.1/EVIDENCE/calibration-final.md`. Headline:
+# matmul cells confirm the 2× starting point within ±6% (need 13.4×/17.7×/27.6×
+# for fp32/fp16/bf16 P99 — already exceeded by the FA precedent in many cases),
+# but conv2d is a real outlier (+225% fp32, +75% fp16, +70% bf16 vs v3 200-iter
+# projection). The per-(kernel, dtype) refactor is task T-24 in
+# IMPLEMENTATION_PLAN_v1.1.md and ships in v1.1, not v1.0.
 _MPS_TOLERANCE_MULTIPLIERS: dict[str, float] = {
     "float32": 2.0,
     "float16": 2.0,
