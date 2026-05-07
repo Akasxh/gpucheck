@@ -60,11 +60,16 @@ def _seed_all(seed: int) -> None:
         pass
 
 
-def _equal(a: Any, b: Any) -> bool:
-    """Compare two outputs for byte-identical equality.
+def _equal(a: Any, b: Any, *, atol: float = 0.0, rtol: float = 0.0) -> bool:
+    """Compare two outputs.
+
+    Default mode (``atol=rtol=0``) is byte-identical equality via
+    :func:`torch.equal`. When either tolerance is non-zero, falls back
+    to :func:`torch.allclose` (the right contract for MPS, where
+    research SYNTHESIS §4 documents best-effort determinism).
 
     Handles torch.Tensor (same device, same dtype), tuples / lists
-    elementwise, and falls back to ``==``.
+    elementwise, and falls back to ``==`` for non-tensor scalars.
     """
     try:
         import torch
@@ -72,13 +77,18 @@ def _equal(a: Any, b: Any) -> bool:
         if isinstance(a, torch.Tensor) and isinstance(b, torch.Tensor):
             if a.shape != b.shape or a.dtype != b.dtype or a.device != b.device:
                 return False
-            return bool(torch.equal(a, b))
+            if atol == 0.0 and rtol == 0.0:
+                return bool(torch.equal(a, b))
+            return bool(torch.allclose(a, b, atol=atol, rtol=rtol))
     except ImportError:
         pass
     if isinstance(a, (tuple, list)) and isinstance(b, (tuple, list)):
         if len(a) != len(b):
             return False
-        return all(_equal(x, y) for x, y in zip(a, b, strict=False))
+        return all(
+            _equal(x, y, atol=atol, rtol=rtol)
+            for x, y in zip(a, b, strict=False)
+        )
     return bool(a == b)
 
 
@@ -87,9 +97,11 @@ def assert_deterministic(
     *args: Any,
     n: int = 3,
     seed: int = 0,
+    atol: float = 0.0,
+    rtol: float = 0.0,
     **kwargs: Any,
 ) -> Any:
-    """Run *fn* ``n`` times under fixed seeds; assert outputs match exactly.
+    """Run *fn* ``n`` times under fixed seeds; assert outputs match.
 
     Parameters
     ----------
@@ -104,6 +116,12 @@ def assert_deterministic(
         Seed applied to ``random``, ``numpy.random``, ``torch.manual_seed``,
         ``torch.cuda.manual_seed_all``, and ``torch.mps.manual_seed`` (if
         available) before each call.
+    atol, rtol:
+        Tolerance knobs for the cross-run comparison. Default ``0.0``
+        means byte-identical equality (``torch.equal``). When either is
+        non-zero, comparison switches to ``torch.allclose`` —
+        appropriate for MPS where research SYNTHESIS §4 documents
+        best-effort (not bit-exact) determinism.
 
     Returns
     -------
@@ -113,7 +131,8 @@ def assert_deterministic(
     Raises
     ------
     DeterminismError:
-        If any run's output differs from the first run.
+        If any run's output differs from the first run beyond the
+        configured tolerance.
     """
     if n < 2:
         raise ValueError(f"assert_deterministic requires n >= 2, got {n}")
@@ -123,13 +142,18 @@ def assert_deterministic(
     for i in range(1, n):
         _seed_all(seed)
         candidate = fn(*args, **kwargs)
-        if not _equal(first, candidate):
+        if not _equal(first, candidate, atol=atol, rtol=rtol):
+            mode = "byte-identical" if atol == 0.0 and rtol == 0.0 else (
+                f"allclose(atol={atol}, rtol={rtol})"
+            )
             raise DeterminismError(
                 f"assert_deterministic: run {i} produced output that differs "
-                f"from run 0 (n={n}, seed={seed}). On MPS this can happen "
-                f"legitimately (best-effort determinism per SYNTHESIS §4); "
-                f"consider widening tolerances via tolerance_context, or "
-                f"adding the op to the [tool.gpucheck.mps.xfail] block."
+                f"from run 0 (n={n}, seed={seed}, mode={mode}). On MPS this "
+                f"can happen legitimately (best-effort determinism per "
+                f"SYNTHESIS §4); pass `atol=`/`rtol=` to opt into "
+                f"tolerance-based determinism, widen tolerances via "
+                f"tolerance_context, or add the op to the "
+                f"[tool.gpucheck.mps.xfail] block."
             )
     return first
 
@@ -138,14 +162,17 @@ def requires_determinism(
     *,
     n: int = 3,
     seed: int = 0,
+    atol: float = 0.0,
+    rtol: float = 0.0,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator: invoke the test function ``n`` times under fixed seeds.
 
     Equivalent to wrapping the test body in
-    :func:`assert_deterministic`. Useful when the test's return value is
-    the artifact under test::
+    :func:`assert_deterministic`. ``atol``/``rtol`` are forwarded so
+    MPS users can opt into tolerance-based determinism instead of the
+    byte-equality default::
 
-        @requires_determinism(n=5, seed=42)
+        @requires_determinism(n=5, seed=42, atol=1e-5)
         def test_my_kernel():
             x = torch.randn(64, 64, device="mps")
             return my_kernel(x)
@@ -153,7 +180,9 @@ def requires_determinism(
     def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(fn)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            return assert_deterministic(fn, *args, n=n, seed=seed, **kwargs)
+            return assert_deterministic(
+                fn, *args, n=n, seed=seed, atol=atol, rtol=rtol, **kwargs,
+            )
         return wrapper
     return decorator
 

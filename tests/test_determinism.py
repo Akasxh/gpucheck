@@ -101,3 +101,89 @@ def test_assert_deterministic_with_torch_tensor_outputs() -> None:
 
     out = assert_deterministic(fn, n=3, seed=0)
     assert out.shape == (3, 3)
+
+
+# ---------------------------------------------------------------------------
+# atol / rtol kwargs (review BLOCKER A2)
+# ---------------------------------------------------------------------------
+
+
+def test_assert_deterministic_default_is_byte_equal() -> None:
+    """Without atol/rtol, comparison is bit-exact via torch.equal —
+    a tensor that differs by 1 ULP still triggers DeterminismError.
+    """
+    torch = pytest.importorskip("torch")
+    counter = {"i": 0}
+
+    def drift_by_eps() -> torch.Tensor:
+        counter["i"] += 1
+        # Different output each call: tiny perturbation but bit-different.
+        base = torch.zeros(2, 2)
+        return base + (counter["i"] * 1e-7)
+
+    with pytest.raises(DeterminismError, match="byte-identical"):
+        assert_deterministic(drift_by_eps, n=2)
+
+
+def test_assert_deterministic_atol_accepts_drift_within_tolerance() -> None:
+    """atol > drift => assert_deterministic passes. The contract that
+    review A2 demanded for MPS use cases.
+    """
+    torch = pytest.importorskip("torch")
+    counter = {"i": 0}
+
+    def drift_by_eps() -> torch.Tensor:
+        counter["i"] += 1
+        base = torch.zeros(2, 2)
+        return base + (counter["i"] * 1e-7)
+
+    # atol much larger than the per-call drift — should accept.
+    out = assert_deterministic(drift_by_eps, n=3, atol=1e-3)
+    assert out.shape == (2, 2)
+
+
+def test_assert_deterministic_atol_rejects_drift_above_tolerance() -> None:
+    """atol < drift => assert_deterministic still fails (with the
+    new tolerance-mode error message).
+    """
+    torch = pytest.importorskip("torch")
+    counter = {"i": 0}
+
+    def drift_by_one() -> torch.Tensor:
+        counter["i"] += 1
+        # Drift of 1.0 between calls — well above any reasonable atol.
+        return torch.zeros(2, 2) + counter["i"]
+
+    with pytest.raises(DeterminismError, match="allclose"):
+        assert_deterministic(drift_by_one, n=2, atol=1e-3)
+
+
+def test_assert_deterministic_rtol_accepts_relative_drift() -> None:
+    """rtol path mirrors atol — covers the rtol leg of allclose."""
+    torch = pytest.importorskip("torch")
+    counter = {"i": 0}
+
+    def drift_relative() -> torch.Tensor:
+        counter["i"] += 1
+        # Drifts proportionally — rtol catches this, atol alone wouldn't.
+        return torch.full((2, 2), 1000.0) + counter["i"] * 1e-3
+
+    out = assert_deterministic(drift_relative, n=3, rtol=1e-2)
+    assert out.shape == (2, 2)
+
+
+def test_requires_determinism_forwards_atol() -> None:
+    """The decorator must accept and forward atol so MPS users can
+    write `@requires_determinism(n=3, atol=1e-5)`.
+    """
+    torch = pytest.importorskip("torch")
+    counter = {"i": 0}
+
+    @requires_determinism(n=2, seed=0, atol=1e-3)
+    def drift_within() -> torch.Tensor:
+        counter["i"] += 1
+        return torch.zeros(2, 2) + counter["i"] * 1e-7
+
+    out = drift_within()
+    assert out.shape == (2, 2)
+    assert counter["i"] == 2

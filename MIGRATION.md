@@ -311,12 +311,19 @@ v1 adds `gpucheck.sanitizers.determinism`:
 ```python
 from gpucheck.sanitizers import assert_deterministic, requires_determinism, DeterminismError
 
-# Function form — fix seeds + run twice + compare
-assert_deterministic(my_kernel, args=(x, y), runs=2, atol=0.0)
+# Function form — fix seeds, re-run `n` times, compare outputs.
+# `*args` / `**kwargs` are forwarded to my_kernel.
+# Default mode is byte-identical (torch.equal); pass atol=/rtol= to
+# opt into tolerance-based determinism (the right contract for MPS).
+assert_deterministic(my_kernel, x, y, n=2)
+assert_deterministic(my_kernel, x, y, n=3, atol=1e-5)  # MPS-friendly
 
 # Decorator form — gate a test on determinism
-@requires_determinism
+@requires_determinism(n=3, seed=0)        # byte-identical mode
 def test_kernel_is_reproducible(): ...
+
+@requires_determinism(n=3, atol=1e-5)     # tolerance mode (MPS)
+def test_mps_kernel_is_quasi_deterministic(): ...
 ```
 
 PyTorch's MPS docs are silent on determinism, and the empirical record
