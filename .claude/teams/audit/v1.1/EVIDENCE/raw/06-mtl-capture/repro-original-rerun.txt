@@ -1,0 +1,73 @@
+torch=2.11.0
+
+=== Test 1: Cold-start 1024^3 fp32 (only this shape, only this dtype, fresh process equiv) ===
+  call  0: 9.4248 ms
+  call  1: 2.8265 ms
+  call  2: 2.6044 ms
+  call  3: 2.2670 ms
+  call  4: 2.1075 ms
+  call  5: 2.1578 ms
+  call  6: 2.2438 ms
+  call  7: 1.7070 ms
+  call  8: 2.0543 ms
+  call  9: 2.6828 ms
+  call 10: 2.6554 ms
+  call 11: 0.7675 ms
+  call 12: 0.8254 ms
+  call 13: 0.8408 ms
+  call 14: 1.0498 ms
+
+=== Test 2: After fp32 'sticks' at 3ms, run fp16, then back to fp32 ===
+  >>> running 5 fp16 1024^3:
+    fp16 call 0: 2.6280 ms
+    fp16 call 1: 0.3568 ms
+    fp16 call 2: 0.3454 ms
+    fp16 call 3: 0.3310 ms
+    fp16 call 4: 0.3191 ms
+  >>> back to fp32 1024^3:
+    fp32 call 0: 0.8021 ms
+    fp32 call 1: 0.7636 ms
+    fp32 call 2: 0.7712 ms
+    fp32 call 3: 1.0296 ms
+    fp32 call 4: 1.0155 ms
+
+=== Test 3: Run 2048^3 fp32 'crosstalk' check ===
+  Fresh tensors, fp32 1024^3 cold, then fp32 2048^3, then fp32 1024^3 again:
+  cold 1024 fp32: 0.7961 ms
+  cold 1024 fp32: 0.7719 ms
+  cold 1024 fp32: 0.8014 ms
+  2048 fp32: 6.8328 ms
+  back 1024 fp32: 1.0310 ms
+  back 1024 fp32: 0.8185 ms
+  back 1024 fp32: 0.8344 ms
+  back 1024 fp32: 0.7676 ms
+  back 1024 fp32: 0.7489 ms
+
+=== Test 4: Cold-start 2048^3 fp32 (only this shape) ===
+  call  0: 5.2487 ms
+  call  1: 4.9265 ms
+  call  2: 5.0744 ms
+  call  3: 4.8945 ms
+  call  4: 4.9405 ms
+  call  5: 5.0838 ms
+  call  6: 4.8608 ms
+  call  7: 4.9047 ms
+  call  8: 4.8768 ms
+  call  9: 4.8528 ms
+
+=== Test 5: Cold-start 1024^3 fp16 (only this shape) ===
+  call  0: 0.3644 ms
+  call  1: 0.3215 ms
+  call  2: 0.3430 ms
+  call  3: 0.3388 ms
+  call  4: 0.3563 ms
+  call  5: 0.3618 ms
+  call  6: 0.3556 ms
+  call  7: 0.3502 ms
+  call  8: 0.3449 ms
+  call  9: 0.3493 ms
+  call 10: 0.3485 ms
+  call 11: 0.3654 ms
+  call 12: 0.3346 ms
+  call 13: 0.3441 ms
+  call 14: 0.3517 ms

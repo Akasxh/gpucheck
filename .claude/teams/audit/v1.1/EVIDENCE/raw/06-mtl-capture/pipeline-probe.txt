@@ -1,0 +1,129 @@
+Device: Apple M5 arch=applegpu_g17g
+PID=78004
+
+=== SLOW 1024^3 fp32 cold ===
+
+--- slow-0: cb=<MPSCommandBuffer: 0xb248403c0> (MPSCommandBuffer)
+  cb methods (sample): ['accessibilityParameterizedAttributeNames', 'className', 'commit', 'commitAndContinue', 'entityName', 'handleFailoversForClassNamed_', 'swiftui_accessibilityLabel', 'valueWithName_inPropertyWithKey_']
+  underlying MTLCommandBuffer:
+    label: (none)
+    kernelStartTime: 827973.1112959167
+    kernelEndTime: 827973.112302375
+    GPUStartTime: 827973.112402125
+    GPU exec ms: 2.723
+    logs: (
+)
+
+--- slow-1: cb=<MPSCommandBuffer: 0xb248404b0> (MPSCommandBuffer)
+  cb methods (sample): ['accessibilityParameterizedAttributeNames', 'className', 'commit', 'commitAndContinue', 'entityName', 'handleFailoversForClassNamed_', 'swiftui_accessibilityLabel', 'valueWithName_inPropertyWithKey_']
+  underlying MTLCommandBuffer:
+    label: (none)
+    kernelStartTime: 827973.115776125
+    kernelEndTime: 827973.1158837917
+    GPUStartTime: 827973.1159668751
+    GPU exec ms: 2.721
+    logs: (
+)
+
+--- slow-2: cb=<MPSCommandBuffer: 0xb24840550> (MPSCommandBuffer)
+  cb methods (sample): ['accessibilityParameterizedAttributeNames', 'className', 'commit', 'commitAndContinue', 'entityName', 'handleFailoversForClassNamed_', 'swiftui_accessibilityLabel', 'valueWithName_inPropertyWithKey_']
+  underlying MTLCommandBuffer:
+    label: (none)
+    kernelStartTime: 827973.1191680001
+    kernelEndTime: 827973.1192906251
+    GPUStartTime: 827973.1193767501
+    GPU exec ms: 2.728
+    logs: (
+)
+
+--- slow-3: cb=<MPSCommandBuffer: 0xb248405a0> (MPSCommandBuffer)
+  cb methods (sample): ['accessibilityParameterizedAttributeNames', 'className', 'commit', 'commitAndContinue', 'entityName', 'handleFailoversForClassNamed_', 'swiftui_accessibilityLabel', 'valueWithName_inPropertyWithKey_']
+  underlying MTLCommandBuffer:
+    label: (none)
+    kernelStartTime: 827973.1224850417
+    kernelEndTime: 827973.12259375
+    GPUStartTime: 827973.1226801251
+    GPU exec ms: 2.730
+    logs: (
+)
+
+--- slow-4: cb=<MPSCommandBuffer: 0xb248405f0> (MPSCommandBuffer)
+  cb methods (sample): ['accessibilityParameterizedAttributeNames', 'className', 'commit', 'commitAndContinue', 'entityName', 'handleFailoversForClassNamed_', 'swiftui_accessibilityLabel', 'valueWithName_inPropertyWithKey_']
+  underlying MTLCommandBuffer:
+    label: (none)
+    kernelStartTime: 827973.12574675
+    kernelEndTime: 827973.1258457501
+    GPUStartTime: 827973.1259349167
+    GPU exec ms: 2.724
+    logs: (
+)
+
+=== OFF-SHAPE 2048^3 fp32 ===
+
+--- off-0: cb=<MPSCommandBuffer: 0xb24840730> (MPSCommandBuffer)
+  cb methods (sample): ['accessibilityParameterizedAttributeNames', 'className', 'commit', 'commitAndContinue', 'entityName', 'handleFailoversForClassNamed_', 'swiftui_accessibilityLabel', 'valueWithName_inPropertyWithKey_']
+  underlying MTLCommandBuffer:
+    label: (none)
+    kernelStartTime: 827973.2043459167
+    kernelEndTime: 827973.20543125
+    GPUStartTime: 827973.205713
+    GPU exec ms: 14.264
+    logs: (
+)
+
+=== FAST 1024^3 fp32 post-unblock ===
+
+--- fast-0: cb=<MPSCommandBuffer: 0xb24840870> (MPSCommandBuffer)
+  cb methods (sample): ['accessibilityParameterizedAttributeNames', 'className', 'commit', 'commitAndContinue', 'entityName', 'handleFailoversForClassNamed_', 'swiftui_accessibilityLabel', 'valueWithName_inPropertyWithKey_']
+  underlying MTLCommandBuffer:
+    label: (none)
+    kernelStartTime: 827973.2394241667
+    kernelEndTime: 827973.239611375
+    GPUStartTime: 827973.2398842501
+    GPU exec ms: 0.950
+    logs: (
+)
+
+--- fast-1: cb=<MPSCommandBuffer: 0xb248408c0> (MPSCommandBuffer)
+  cb methods (sample): ['accessibilityParameterizedAttributeNames', 'className', 'commit', 'commitAndContinue', 'entityName', 'handleFailoversForClassNamed_', 'swiftui_accessibilityLabel', 'valueWithName_inPropertyWithKey_']
+  underlying MTLCommandBuffer:
+    label: (none)
+    kernelStartTime: 827973.241244375
+    kernelEndTime: 827973.2413468751
+    GPUStartTime: 827973.2415695001
+    GPU exec ms: 0.939
+    logs: (
+)
+
+--- fast-2: cb=<MPSCommandBuffer: 0xb24840910> (MPSCommandBuffer)
+  cb methods (sample): ['accessibilityParameterizedAttributeNames', 'className', 'commit', 'commitAndContinue', 'entityName', 'handleFailoversForClassNamed_', 'swiftui_accessibilityLabel', 'valueWithName_inPropertyWithKey_']
+  underlying MTLCommandBuffer:
+    label: (none)
+    kernelStartTime: 827973.242860125
+    kernelEndTime: 827973.2429644167
+    GPUStartTime: 827973.24313475
+    GPU exec ms: 0.933
+    logs: (
+)
+
+--- fast-3: cb=<MPSCommandBuffer: 0xb24840960> (MPSCommandBuffer)
+  cb methods (sample): ['accessibilityParameterizedAttributeNames', 'className', 'commit', 'commitAndContinue', 'entityName', 'handleFailoversForClassNamed_', 'swiftui_accessibilityLabel', 'valueWithName_inPropertyWithKey_']
+  underlying MTLCommandBuffer:
+    label: (none)
+    kernelStartTime: 827973.244371125
+    kernelEndTime: 827973.2444662501
+    GPUStartTime: 827973.2446497501
+    GPU exec ms: 0.934
+    logs: (
+)
+
+--- fast-4: cb=<MPSCommandBuffer: 0xb248409b0> (MPSCommandBuffer)
+  cb methods (sample): ['accessibilityParameterizedAttributeNames', 'className', 'commit', 'commitAndContinue', 'entityName', 'handleFailoversForClassNamed_', 'swiftui_accessibilityLabel', 'valueWithName_inPropertyWithKey_']
+  underlying MTLCommandBuffer:
+    label: (none)
+    kernelStartTime: 827973.2458693751
+    kernelEndTime: 827973.2459611667
+    GPUStartTime: 827973.2461526667
+    GPU exec ms: 0.935
+    logs: (
+)

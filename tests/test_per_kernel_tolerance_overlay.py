@@ -27,7 +27,6 @@ from gpucheck.assertions.tolerances import (
     _resolve_mps_multiplier,
 )
 
-
 # ---------------------------------------------------------------------------
 # Per-cell pinning — every measured cell from drift_histogram_5k.json
 # ---------------------------------------------------------------------------

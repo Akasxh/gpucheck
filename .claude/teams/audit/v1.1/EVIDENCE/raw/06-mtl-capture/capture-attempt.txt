@@ -1,0 +1,22 @@
+--- Capture diagnostics ---
+  python exe: /Users/cero/Code/gpucheck/.venv/bin/python
+  PID: 76942
+  shared manager: <MTLCaptureManager: 0x8631d07a0>
+  supportsDestination(GPUTraceDocument) = False
+  supportsDestination(DeveloperTools) = False
+  isCapturing: False
+  defaultCaptureScope: None
+  metal device: Apple M5
+
+=== PHASE A: SLOW 1024^3 fp32 ===
+  [slow] startCapture(GPUTraceDocument) FAILED: Error Domain=MTLCaptureError Code=1 "Capture layer is not inserted." UserInfo={NSLocalizedDescription=Capture layer is not inserted., NSLocalizedRecoverySuggestion=Enable GPU Frame Capture in your Xcode scheme or run with MTL_CAPTURE_ENABLED=1.}
+  [slow] startCapture(DeveloperTools) ALSO FAILED: Error Domain=MTLCaptureError Code=1 "Capture layer is not inserted." UserInfo={NSLocalizedDescription=Capture layer is not inserted., NSLocalizedRecoverySuggestion=Enable GPU Frame Capture in your Xcode scheme or run with MTL_CAPTURE_ENABLED=1.}
+  matmul ms (uncaptured): 4.392
+
+=== OFF-SHAPE 2048^3 ===
+  matmul ms: 10.161
+
+=== PHASE B: FAST 1024^3 fp32 (after off-shape) ===
+  [fast] startCapture(GPUTraceDocument) FAILED: Error Domain=MTLCaptureError Code=1 "Capture layer is not inserted." UserInfo={NSLocalizedDescription=Capture layer is not inserted., NSLocalizedRecoverySuggestion=Enable GPU Frame Capture in your Xcode scheme or run with MTL_CAPTURE_ENABLED=1.}
+  [fast] startCapture(DeveloperTools) ALSO FAILED: Error Domain=MTLCaptureError Code=1 "Capture layer is not inserted." UserInfo={NSLocalizedDescription=Capture layer is not inserted., NSLocalizedRecoverySuggestion=Enable GPU Frame Capture in your Xcode scheme or run with MTL_CAPTURE_ENABLED=1.}
+  matmul ms (uncaptured): 0.989
