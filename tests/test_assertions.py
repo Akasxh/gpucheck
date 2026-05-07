@@ -364,6 +364,64 @@ class TestBaseline2xDoublesTolerance:
             assert_close(a, b, baseline_2x=True)
 
 
+class TestBaseline2xKDimScaling:
+    """Regression test for BLOCKER N1.
+
+    The ``baseline_2x`` path used to scale ``atol`` by ``sqrt(k_dim)``
+    while every other code path scales by ``sqrt(k_dim/128)``. At
+    k_dim=4096 the two diverge by ``sqrt(128) ≈ 11.3×`` — silently
+    making ``baseline_2x=True`` 11× more permissive than canonical.
+    The expectation: ``baseline_2x`` is exactly 2× the canonical
+    tolerance for the same dtype + k_dim.
+    """
+
+    @pytest.mark.parametrize("k_dim", [128, 1024, 4096])
+    def test_baseline_2x_is_exactly_2x_canonical(self, k_dim: int) -> None:
+        # Canonical: dtype-aware + sqrt(k_dim/128) scaling.
+        canonical_atol, canonical_rtol = compute_tolerance("float16", k_dim=k_dim)
+
+        # Build two arrays with diff that sits just inside 2× canonical
+        # but outside 1× canonical. baseline_2x should pass; canonical
+        # should fail.
+        # We deliberately craft the diff at 1.5× canonical_atol so it
+        # demonstrably fails canonical and passes 2x — and then we
+        # also pin the boundary at 2.5× to demonstrate it fails the 2x
+        # threshold (proving 2x is not the bug-prone 256x).
+        diff = canonical_atol * 1.5
+        a = np.array([0.0], dtype=np.float16)
+        b = np.array([diff], dtype=np.float16)
+
+        # Sanity: canonical (no baseline_2x) rejects diff > 1× canonical.
+        with pytest.raises(AssertionError):
+            assert_close(a, b, k_dim=k_dim)
+
+        # baseline_2x must accept diff < 2× canonical at this k_dim.
+        assert_close(a, b, k_dim=k_dim, baseline_2x=True)
+
+        # baseline_2x must still reject diff > 2× canonical: pin at 2.5×.
+        a2 = np.array([0.0], dtype=np.float16)
+        b2 = np.array([canonical_atol * 2.5], dtype=np.float16)
+        with pytest.raises(AssertionError):
+            assert_close(a2, b2, k_dim=k_dim, baseline_2x=True)
+        # rtol unused in this craft (b2 large; expected==0 → rtol leg vanishes).
+        assert canonical_rtol >= 0.0
+
+    @pytest.mark.parametrize("k_dim", [128, 1024, 4096])
+    def test_baseline_2x_does_not_use_sqrt_k(self, k_dim: int) -> None:
+        """At k_dim=4096 the buggy sqrt(K) path was ``11.3× looser`` than
+        the canonical sqrt(K/128) path. Pin the contract so the bug
+        cannot regress: a diff at ``2.5× canonical_atol`` MUST fail.
+        Under the old bug, the threshold would be ``2× sqrt(128) ≈
+        22.6×`` of canonical — and 2.5× canonical would erroneously
+        pass.
+        """
+        canonical_atol, _ = compute_tolerance("float16", k_dim=k_dim)
+        a = np.array([0.0], dtype=np.float16)
+        b = np.array([canonical_atol * 2.5], dtype=np.float16)
+        with pytest.raises(AssertionError):
+            assert_close(a, b, k_dim=k_dim, baseline_2x=True)
+
+
 # ---------------------------------------------------------------------------
 # Mixed-precision _resolve_dtype
 # ---------------------------------------------------------------------------
