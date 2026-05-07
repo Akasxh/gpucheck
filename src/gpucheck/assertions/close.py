@@ -10,13 +10,29 @@ import numpy.typing as npt
 from gpucheck.assertions.reporting import format_mismatch_report
 from gpucheck.assertions.tolerances import compute_tolerance
 
-try:
-    import torch as _torch
+# Cached lazy-imported torch module (None if not installed).
+# Module-level cache; sentinel `_TORCH_UNRESOLVED` distinguishes "not yet looked
+# up" from "looked up and absent" so the lookup happens at most once.
+_TORCH_UNRESOLVED: Any = object()
+_torch_cached: Any = _TORCH_UNRESOLVED
 
-    _has_torch = True
-except ImportError:
-    _torch = None  # type: ignore[assignment]
-    _has_torch = False
+
+def _torch_mod() -> Any:
+    """Lazy-import torch and cache the module (or ``None`` if unavailable).
+
+    CLAUDE.md mandates that torch is never imported at collection / import
+    time — only when an API actually needs it.  This helper is the single
+    point of access; every call site goes through it.
+    """
+    global _torch_cached
+    if _torch_cached is _TORCH_UNRESOLVED:
+        try:
+            import torch as _t
+        except ImportError:
+            _torch_cached = None
+        else:
+            _torch_cached = _t
+    return _torch_cached
 
 
 def _to_numpy(tensor: Any) -> npt.NDArray[Any]:
@@ -143,7 +159,8 @@ def assert_close(
     # SYNTHESIS §7: MPS multipliers are PROVISIONAL until calibrated on
     # M-silicon; numbers may inflate post-calibration.
     device_type: str | None = None
-    if _has_torch:
+    _torch = _torch_mod()
+    if _torch is not None:
         for t in (actual, expected):
             if isinstance(t, _torch.Tensor):
                 device_type = t.device.type
@@ -174,7 +191,7 @@ def assert_close(
     # --- GPU fast-path: avoid CPU transfer when tensors match ---
     # Widened to MPS in v1.0; torch.allclose is device-agnostic.
     if (
-        _has_torch
+        _torch is not None
         and isinstance(actual, _torch.Tensor)
         and isinstance(expected, _torch.Tensor)
         and actual.device == expected.device
