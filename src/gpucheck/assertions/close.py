@@ -42,7 +42,10 @@ def _to_numpy(tensor: Any) -> npt.NDArray[Any]:
 
     # torch.Tensor
     if hasattr(tensor, "detach"):
-        t = tensor.detach().cpu()
+        # `.contiguous()` is required on torch <2.1 to avoid RuntimeError on
+        # stride-fuzzed / sliced / transposed inputs when calling `.numpy()`.
+        # Preventive on newer torch — known to fire on older PyTorch (PM-4).
+        t = tensor.detach().cpu().contiguous()
         # Preserve float64 precision; only cast non-numpy-compatible dtypes
         if t.is_floating_point():
             if t.dtype.itemsize >= 8:
@@ -69,7 +72,7 @@ def _to_numpy(tensor: Any) -> npt.NDArray[Any]:
         try:
             import torch
 
-            t = torch.as_tensor(tensor).detach().cpu()
+            t = torch.as_tensor(tensor).detach().cpu().contiguous()
             if t.is_floating_point():
                 if t.dtype.itemsize >= 8:
                     return t.double().numpy()

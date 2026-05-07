@@ -40,3 +40,34 @@ inside `assert_close` (device-type detection and the GPU fast-path) now bind
   monkey-patches `sys.modules['torch']` after `_torch_mod()` has run once,
   the cached value will be stale. Existing tests do not do this, but the
   verifier should confirm.
+
+## Task T-02 (`.contiguous()` on slow path)
+
+### What I did
+Added `.contiguous()` to both torch.Tensor branches of `_to_numpy` (the
+primary `hasattr(tensor, "detach")` branch and the dlpack fallback in the
+`__cuda_array_interface__` block). Wrote a new parametrized test module
+`tests/test_assert_close_contiguous.py` covering three stride patterns:
+slice (`[:, ::2]`), transpose (`.t()`), and broadcast (`.expand`).
+
+### Files modified
+- `src/gpucheck/assertions/close.py`: two `.cpu().contiguous()` insertions; PM-4 citation comment.
+
+### Files created
+- `tests/test_assert_close_contiguous.py`: 6 parametrized cases (3 stride patterns × 2 entry points).
+
+### Design decisions made during implementation
+- Applied `.contiguous()` to the dlpack fallback as well even though only
+  the primary branch is in the strict T-02 scope. The same RuntimeError
+  surface exists in both code paths and the cost is negligible. Noted
+  here as an opportunistic widen so the reviewer can flag if undesired.
+- Used `pytest.importorskip("torch")` rather than the existing
+  `_has_torch`-style guard so the module skips cleanly on torch-less
+  hosts (matches the lazy-import discipline from T-01).
+
+### Potential blast radius
+- `.contiguous()` allocates a new tensor when the input is non-contiguous.
+  For very large stride-fuzzed tensors this could double peak memory in
+  the slow path. Existing CUDA fast-path (which bypasses `_to_numpy`)
+  already handles same-shape tensors without copying, so the regression is
+  bounded to mismatched / failing comparisons.
