@@ -5,10 +5,48 @@ from __future__ import annotations
 import math
 from contextlib import contextmanager
 from contextvars import ContextVar
+from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Generator
+
+
+class KernelClass(str, Enum):
+    """Kernel-class buckets for the per-(kernel, dtype) MPS tolerance overlay.
+
+    Buckets follow the Shape-B class-bucketed taxonomy from the v1.1 5K
+    calibration (see ``.claude/teams/audit/v1.1/EVIDENCE/calibration-final.md``).
+    The classification is structural, not name-matched: callers tag kernels
+    by their numerical-error profile, not by torch op identity.
+
+    - ``MATMUL`` — GEMM-dominated, no protective normalization
+      (``matmul``, ``linear``, ``bmm``, ``addmm``, ``einsum`` GEMM forms).
+    - ``CONV2D`` — K-accumulating conv kernels (``conv1d``/``conv2d``/
+      ``conv3d``, ``conv_transpose2d``); breached the FA-2× ceiling at
+      5K-iter measurement on M5.
+    - ``NORM`` — norm-protected kernels (``layer_norm``, ``rms_norm``,
+      ``batch_norm``, ``group_norm``).
+    - ``REDUCTION`` — reductions and softmaxes (``softmax``, ``log_softmax``,
+      ``mean``, ``sum``, ``cross_entropy``).
+    - ``POINTWISE`` — elementwise activations (``gelu``, ``silu``, ``relu``,
+      ``tanh``, ``sigmoid``).
+    - ``DEFAULT`` — fallback bucket; resolves to the flat-by-dtype overlay
+      preserved from v1.0 (the ``_MPS_TOLERANCE_MULTIPLIERS`` table below).
+    """
+
+    MATMUL = "matmul"
+    CONV2D = "conv2d"
+    NORM = "norm"
+    REDUCTION = "reduction"
+    POINTWISE = "pointwise"
+    DEFAULT = "default"
+
+
+# Sentinel used as the dtype slot in `_MPS_KERNEL_DTYPE_MULTIPLIERS` keys to
+# mark "applies to every dtype in this kernel class" (e.g. NORM is 2× across
+# fp32/fp16/bf16/etc.). Wildcard lookups happen after exact-dtype lookups.
+_DTYPE_WILDCARD = "*"
 
 _DEFAULT_TOLERANCES: dict[str, tuple[float, float]] = {
     # dtype_name: (atol, rtol)
@@ -25,22 +63,18 @@ _DEFAULT_TOLERANCES: dict[str, tuple[float, float]] = {
     "tf32": (5e-4, 5e-4),
 }
 
-# PROVISIONAL — research SYNTHESIS §7. These multipliers are mapped from the
-# real PyTorch MPS bug magnitudes documented in
-# `.claude/teams/research/v1.0/SYNTHESIS.md` (pytorch#177116, #181936, #178497,
-# #142836, #173525, #175189, #96602 etc.) but the precise values must be
-# calibrated on Akash's actual M-generation hardware before being canonical
-# (sub-Q 7 § "Calibration plan"). Until then, treat as a directional overlay.
-# 2× is the FlashAttention precedent (assertions/close.py:117 baseline_2x).
+# Flat per-dtype MPS overlay (v1.0 baseline, preserved for backward compat).
 #
-# v1.1 calibration data on Apple M5 (5K samples × 21 cells, 2026-05-07) is
-# captured at `.claude/teams/audit/v1.1/drift_histogram_5k.json` and analysed
-# in `.claude/teams/audit/v1.1/EVIDENCE/calibration-final.md`. Headline:
-# matmul cells confirm the 2× starting point within ±6% (need 13.4×/17.7×/27.6×
-# for fp32/fp16/bf16 P99 — already exceeded by the FA precedent in many cases),
-# but conv2d is a real outlier (+225% fp32, +75% fp16, +70% bf16 vs v3 200-iter
-# projection). The per-(kernel, dtype) refactor is task T-24 in
-# IMPLEMENTATION_PLAN_v1.1.md and ships in v1.1, not v1.0.
+# This table is the DEFAULT-kernel-class fallback for the v1.1 per-(kernel,
+# dtype) overlay below. v1.0 callers that pass `compute_tolerance(dtype,
+# device_type="mps")` without a `kernel_class=` keep getting the 2× scale
+# they shipped with — see `compute_tolerance` for the resolution order.
+#
+# Origin: research SYNTHESIS §7. These multipliers are mapped from the real
+# PyTorch MPS bug magnitudes documented in
+# `.claude/teams/research/v1.0/SYNTHESIS.md` (pytorch#177116, #181936, #178497,
+# #142836, #173525, #175189, #96602 etc.). 2× is the FlashAttention precedent
+# (`assertions/close.py:baseline_2x`).
 _MPS_TOLERANCE_MULTIPLIERS: dict[str, float] = {
     "float32": 2.0,
     "float16": 2.0,
@@ -49,6 +83,52 @@ _MPS_TOLERANCE_MULTIPLIERS: dict[str, float] = {
     "float8_e4m3fn": 2.0,  # Apple Silicon has no FP8 tensor cores; placeholder.
     "float8_e5m2": 2.0,
     "tf32": 1.0,  # TF32 is NVIDIA-only; Apple Silicon has no analogue.
+}
+
+# Per-(kernel_class, dtype) MPS overlay — v1.1 5K calibration, Apple M5.
+#
+# Source: `.claude/teams/audit/v1.1/drift_histogram_5k.json` (21 cells × 5000
+# iters), analysis `.claude/teams/audit/v1.1/EVIDENCE/calibration-final.md`.
+# Each multiplier is sized to cover the *measured* P99 (and most P99.9 tails)
+# with safety headroom for cross-SKU drift (M3/M4/M5 may shift ±2-3×).
+#
+# Headline rationale per kernel class:
+#   - MATMUL: GEMM has no protective normalization; measured P99
+#     {fp32: 13.43×, fp16: 17.74×, bf16: 27.57×}. Overlay {16, 20, 32}
+#     covers P99 with ≥10% headroom; bf16 P99.9 (31.91×) sits exactly at
+#     the 32× ceiling — at-the-edge but covered.
+#   - CONV2D: K-accumulating, no normalization; v3 verdict (200-iter)
+#     under-tightened. 5K shows fp32 P99=1.98×, fp16 P99=6.71×, bf16
+#     P99=10.44×. Overlay {4, 8, 12} covers P99 with safety; fp32 picks
+#     4× (not 2×) because the P99.9 tail of 2.52× crosses the
+#     FlashAttention-2× ceiling.
+#   - NORM/REDUCTION/POINTWISE: norm-protected and elementwise kernels
+#     all sit comfortably under FA-2× at 5K-iter measurement. Wildcard
+#     dtype row = 2× preserves the v1.0 default for these classes.
+#   - DEFAULT (kernel_class omitted or unrecognized): falls through to
+#     `_MPS_TOLERANCE_MULTIPLIERS` flat table (above). v1.0 behaviour.
+#
+# Resolution order in `compute_tolerance` for a given (kernel_class, dtype):
+#   1. exact `(kernel_class, dtype_name)` key,
+#   2. wildcard `(kernel_class, "*")` key,
+#   3. exact `(KernelClass.DEFAULT, dtype_name)` key (none currently set —
+#      reserved for future per-dtype DEFAULT overrides),
+#   4. flat `_MPS_TOLERANCE_MULTIPLIERS[dtype_name]`,
+#   5. hard fallback `2.0`.
+_MPS_KERNEL_DTYPE_MULTIPLIERS: dict[tuple[KernelClass, str], float] = {
+    # GEMM-dominated cells (5K-measured P99 in calibration-final.md).
+    (KernelClass.MATMUL, "float32"): 16.0,
+    (KernelClass.MATMUL, "float16"): 20.0,
+    (KernelClass.MATMUL, "bfloat16"): 32.0,
+    # Conv-2D cells (revised upward from v3 200-iter projection).
+    (KernelClass.CONV2D, "float32"): 4.0,    # 5K P99=1.98× / P99.9=2.52× → 4× safety
+    (KernelClass.CONV2D, "float16"): 8.0,    # 5K P99=6.71× / P99.9=8.24× → 8× safety
+    (KernelClass.CONV2D, "bfloat16"): 12.0,  # 5K P99=10.44× / P99.9=12.32× → 12× safety
+    # Norm-protected, reductions, pointwise — all dtypes sit under FA-2×
+    # at 5K. Wildcard rows so any dtype (including FP8, fp64) routes to 2×.
+    (KernelClass.NORM, _DTYPE_WILDCARD): 2.0,
+    (KernelClass.REDUCTION, _DTYPE_WILDCARD): 2.0,
+    (KernelClass.POINTWISE, _DTYPE_WILDCARD): 2.0,
 }
 
 # Override stack (per-context). Backed by ``contextvars.ContextVar`` so the
@@ -76,11 +156,49 @@ def _normalize_dtype_name(dtype: Any) -> str:
     return name
 
 
+def _resolve_mps_multiplier(
+    kernel_class: KernelClass | None,
+    dtype_name: str,
+) -> float:
+    """Resolve the MPS tolerance multiplier for a (kernel_class, dtype) pair.
+
+    Resolution order (first match wins):
+
+    1. ``(kernel_class, dtype_name)`` exact in
+       :data:`_MPS_KERNEL_DTYPE_MULTIPLIERS`,
+    2. ``(kernel_class, "*")`` wildcard row,
+    3. ``(KernelClass.DEFAULT, dtype_name)`` exact (currently unused;
+       reserved for future per-dtype DEFAULT overrides),
+    4. flat per-dtype :data:`_MPS_TOLERANCE_MULTIPLIERS` (v1.0 behaviour),
+    5. hard fallback ``2.0`` (FlashAttention precedent).
+
+    When ``kernel_class`` is ``None``, steps 1-3 are skipped — exact
+    v1.0 behaviour is preserved for callers that don't tag a kernel.
+    """
+    if kernel_class is not None:
+        exact = _MPS_KERNEL_DTYPE_MULTIPLIERS.get((kernel_class, dtype_name))
+        if exact is not None:
+            return exact
+        wildcard = _MPS_KERNEL_DTYPE_MULTIPLIERS.get(
+            (kernel_class, _DTYPE_WILDCARD),
+        )
+        if wildcard is not None:
+            return wildcard
+        # Step 3: DEFAULT-class per-dtype override (reserved; presently empty).
+        default_exact = _MPS_KERNEL_DTYPE_MULTIPLIERS.get(
+            (KernelClass.DEFAULT, dtype_name),
+        )
+        if default_exact is not None:
+            return default_exact
+    return _MPS_TOLERANCE_MULTIPLIERS.get(dtype_name, 2.0)
+
+
 def compute_tolerance(
     dtype: Any,
     *,
     k_dim: int | None = None,
     device_type: str | None = None,
+    kernel_class: KernelClass | None = None,
 ) -> tuple[float, float]:
     """Return (atol, rtol) for a given dtype.
 
@@ -89,10 +207,13 @@ def compute_tolerance(
     model where 128 is the standard tile dimension. This means at k_dim=128
     the tolerance is 1x the base, and scales proportionally from there.
 
-    If *device_type* is ``"mps"``, an additional dtype-specific multiplier
-    from :data:`_MPS_TOLERANCE_MULTIPLIERS` is applied. The multipliers are
-    PROVISIONAL until calibrated on the user's M-generation hardware
-    (see SYNTHESIS §7 calibration plan).
+    If *device_type* is ``"mps"``, an MPS-specific multiplier is applied.
+    When *kernel_class* is supplied, the multiplier is resolved from the
+    per-(kernel_class, dtype) overlay in
+    :data:`_MPS_KERNEL_DTYPE_MULTIPLIERS` (v1.1 5K-iter calibration on
+    Apple M5 — see ``EVIDENCE/calibration-final.md``); when omitted, the
+    flat v1.0 :data:`_MPS_TOLERANCE_MULTIPLIERS` table is used unchanged
+    (backward-compatible).
 
     Falls back to float32 tolerances for unknown dtypes.
     """
@@ -111,9 +232,11 @@ def compute_tolerance(
     if k_dim is not None and k_dim > 0:
         atol = atol * math.sqrt(max(k_dim, 1) / 128.0)
 
-    # MPS overlay (PROVISIONAL — see SYNTHESIS §7 calibration plan).
+    # MPS overlay — v1.1 routes through the per-(kernel_class, dtype) table
+    # when `kernel_class` is supplied, falling back to the flat v1.0 table
+    # otherwise (preserving the 2× default for unmodified callers).
     if device_type == "mps":
-        multiplier = _MPS_TOLERANCE_MULTIPLIERS.get(name, 2.0)
+        multiplier = _resolve_mps_multiplier(kernel_class, name)
         atol *= multiplier
         rtol *= multiplier
 

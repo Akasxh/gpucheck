@@ -1,0 +1,267 @@
+Device: Apple M5 arch=applegpu_g17g
+PID=77642
+
+=== slow-1024-cold: graph=<MPSGraph: 0x1030e7ec0> ===
+  compilation desc methods: ['setAccessibilityBrailleMapRenderRegion_', 'setAccessibilityBrailleMapRenderer_', 'setAllowedComputeDevices_', 'setAneCompilerSpatialSplitting_', 'setCallables_', 'setCompilationCompletionHandler_', 'setCompilerOptions_', 'setConstantData_', 'setDisableShapeFolding_', 'setDispatchQueue_', 'setEnableANECHWRankPromotion_', 'setEnableANECValidationWorkflow_', 'setEnableANEFWToFWSignal_', 'setEnableANELateLatch_', 'setEnableCompileResourcesForPackage_', 'setEnableMLIRDiagnostics_', 'setEnableParallelEncode_', 'setEnableShapeEquivalence_', 'setEnableShapeShifterCache_', 'setEnableShapeShifter_', 'setEntryFunctionName_', 'setInputShapeRanges_', 'setLayoutConversionPassConfig_', 'setMaximumNumberOfParallelEncodingRegions_', 'setMinimumNumberOfOpsInParallelRegion_', 'setNilValueForKey_', 'setObservationInfo_', 'setObservation_forObservingKeyPath_', 'setOptimizationLevel_', 'setOptimizationProfile_']
+  compile time: 5.03 ms
+  executable: <MPSGraphExecutable: 0x103103150>
+  executable type: MPSGraphExecutable
+  exe methods (filtered):
+    accessibilityParameterizedAttributeNames
+    applyEntryPointToSymbolAndFileNameMap_device_compilationDescriptor_
+    applyInputTypes_toFunction_
+    applyOptimizationPassesWithDevice_module_compilationID_compilationDescriptor_perEntryPointFuncOpMLIRName_
+    applyOptionsToEntryPoint_compilationDescriptor_
+    ax_prettyDescription
+    checkSpecializationValidForSingleEntry
+    classDescription
+    classDescriptionForDestinationKey_
+    className
+    cloneForFeeds_targetTensors_targetOperations_compilationDescriptor_
+    commonPreInitWithDescriptor_
+    convertMPSGraphShapesToMLIRTypes_funcOp_compilationDescriptor_
+    createMetalPackageAtURL_descriptor_
+    debugDescription
+    description
+    dump
+    dumpArrayOfTensorData_basePath_separator_invocationCount_
+    dumpCompiledProducts
+    dumpModuleWithEV_
+    emitViewerSPIWithDevice_inputShapes_compilationDescriptor_
+    encodeToCommandBuffer_inputsArray_resultsArray_executionDescriptor_
+    encodeWithMPSCommandBuffer_inputsArray_resultsArray_executionDescriptor_
+    entityName
+    functionNames
+    getAttributesFromDescriptors_context_deviceDescriptor_
+    getDeviceCacheKeyForEntryPoint_device_compilationDescriptor_
+    getDeviceCacheKeyForTransformedEntryPointImpl_deviceDescriptor_compilationDescriptor_
+    getDeviceCacheKeyForTransformedEntryPoint_device_compilationDescriptor_
+    getFunctionReflectionData
+    getInputShapesForFunction_
+    getInputShapesForFunction_error_
+    getNewRuntimeForDevice_specializedModule_shapedEntryPoints_compilationDescriptor_
+    getNoDeviceCacheKeyForTransformedEntryPoint_compilationDescriptor_
+    getOutputShapesForFunction_
+    getOutputTypesWithDevice_entryPoint_compilationDescriptor_
+    getOutputTypesWithDevice_inputTypes_compilationDescriptor_
+    getOutputTypesWithDevice_shapedEntryPoint_compilationDescriptor_
+    getRuntimeSpecializationAndEntryFunction_shapedEntryPoint_perEntryPointToSymbolAndFileNameMap_cacheSpecializedModuleLookups_entryFuncOp_runtime_
+    getStateInputPositionsWithEntryFunctionName_
+    getTensorDataArraysWithDevice_feedsDictionary_resultsDictionary_inputsArray_resultsArray_executableExecutionDescriptor_
+    handleFailoversForClassNamed_
+    initWithCoreMLPackageAtURL_compilationDescriptor_
+    initWithCoreMLPackage_executableDescriptor_
+    initWithGraph_device_feeds_targetTensors_targetOperations_executableDescriptor_
+    initWithMILProgramWithURL_executableDescriptor_
+    initWithMILProgram_executableDescriptor_
+    initWithMLIRBytecode_executableDescriptor_
+    initWithMLIRCommon_executableDescriptor_error_
+    initWithMLIRCoreML_executableDescriptor_error_
+    initWithMLIRModule_executableDescriptor_
+    initWithMLIRSourceFromURL_executableDescriptor_
+    initWithMLIRSource_executableDescriptor_
+    initWithMPSGraphPackageAtURLCommon_compilationDescriptor_error_
+    initWithMPSGraphPackageAtURL_adapterExecutable_compilationDescriptor_
+    initWithMPSGraphPackageAtURL_compilationDescriptor_
+    initWithSpecializedMLIRModule_device_shapedEntryPoint_compilationDescriptor_executableDescriptor_
+    initializeFuncNamesInOriginalModule
+    initializeWithMLIRModule_executableDescriptor_
+    inputNamesForFuncOp_
+    inputNamesForFunction_
+    isExecutableForFeeds_targetTensors_targetOperations_compilationDescriptor_
+    lazyInitWithModuleURL_executableDescriptor_callablesDescription_moduleResourcesLoader_
+    methodDescriptionForSelector_
+    newExecutableWithDevice_inputsArray_intermediateOperations_executionDescriptor_
+    objectSpecifier
+    optimizedBytecodeForAllExistingSpecializations
+    optimizedBytecode_entryPoint_compilationDescriptor_
+    optimizedBytecode_inputShapes_compilationDescriptor_
+    optionDescriptionsForBinding_
+    outputNamesForFuncOp_
+    outputNamesForFunction_
+    resourceBlob_resourceName_error_
+    returnOpForFunctionInModule_
+    runAsyncWithCommandQueue_inputsArray_resultsArray_executionDescriptor_
+    runAsyncWithDevice_inputsArray_resultsArray_executionDescriptor_
+    runAsyncWithMTLCommandQueue_inputsArray_resultsArray_executionDescriptor_
+    runInternalWithDevice_commandBuffer_feedsDictionary_resultsDictionary_executableExecutionDescriptor_mpsGraphOwnedCommandBuffer_
+    runInternalWithDevice_commandBuffer_feeds_results_executableExecutionDescriptor_mpsGraphOwnedCommandBuffer_
+    runWithDevice_inputsArray_intermediateOperations_resultsArray_executionDescriptor_
+    runWithDevice_inputsArray_resultsArray_executionDescriptor_
+    runWithMTLCommandQueue_inputsArray_resultsArray_executionDescriptor_
+    safeSwiftCallAsFunction_
+    scriptingValueForSpecifier_
+    sendANEStreamingSessionSignal_sessionDescriptor_report_
+    serializeOptimizedBytecode_signature_bytecodeDictionary_
+    serializeToMPSGraphPackageAtURL_descriptor_
+    specializeForMultipleInputTypesWithDevice_multipleInputTypes_compilationDescriptor_
+    specializeWithDevice_entryPoints_compilationDescriptor_
+    specializeWithDevice_entryPoints_compilationDescriptor_error_
+    specializeWithDevice_inputShapes_compilationDescriptor_
+    specializeWithDevice_inputTypes_compilationDescriptor_
+    specializeWithDevice_shapedEntryPoint_compilationDescriptor_
+    specializeWithDevice_shapedEntryPoints_compilationDescriptor_error_
+    specializedModuleWithDevice_shapedEntryPoints_compilationDescriptor_error_
+    unloadEntryPointToSymbolAndFileNameMap_device_compilationDescriptor_
+    valueWithName_inPropertyWithKey_
+  exe debug:
+<MPSGraphExecutable: 0x103103150> : 
+
+IR: #loc2 = loc("(mpsFileLoc): /AppleInternal/Library/BuildRoots/4~CKOougDLIumVT7yTlHqeQahAOsLoT_pOj6L2VoE/Library/Caches/com.apple.xbs/TemporaryDirectory.ZOD9bx/Sources/MetalPerformanceShadersGraph/mpsgraph/MetalPerformanceShadersGraph/Core/Files/MPSGraphUtilities.mm":3196:0)
+module {
+  func.func @main(%arg0: tensor<1024x1024xf32> loc("(mpsFileLoc): /AppleInternal/Library/BuildRoots/4~CKOougDLIumVT7yTlHqeQahAOsLoT_pOj6L2VoE/Library/Caches/com.apple.xbs/TemporaryDirectory.ZOD9bx/Sources/MetalPerformanceShadersGraph/mpsgraph/MetalPerformanceShadersGraph/Core/Files/MPSGraphUtilities.mm":3196:0), %arg1: tensor<1024x1024xf32> loc("(mpsFileLoc): /AppleInternal/Library/BuildRoots/4~CKOougDLIumVT7yTlHqeQahAOsLoT_pOj6L2VoE/Library/Caches/com.apple.xbs/TemporaryDirectory.ZOD9bx/Sources/MetalPerformanceShadersGraph/mpsgraph/MetalPerformanceShadersGraph/Core/Files/MPSGraphUtilities.mm":3196:0)) -> tensor<1024x1024xf32> {
+    %0 = "mps.matmul"(%arg0, %arg1) <{transpose_lhs = false, transpose_rhs = false}> : (tensor<1024x1024xf32>, tensor<1024x1024xf32>) -> tensor<1024x1024xf32> loc(#loc4)
+    return %0 : tensor<1024x1024xf32> loc(#loc2)
+  } loc(#loc1)
+} lo
+  graph debug FULL:
+<MPSGraph: 0x1030e7ec0> : 
+
+IR: "builtin.module"() ({
+  "func.func"() <{function_type = () -> (), sym_name = "main"}> ({
+    %0 = "mps.placeholder"() : () -> tensor<1024x1024xf32>
+    %1 = "mps.placeholder"() : () -> tensor<1024x1024xf32>
+    %2 = "mps.matmul"(%0, %1) <{transpose_lhs = false, transpose_rhs = false}> : (tensor<1024x1024xf32>, tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
+  }) : () -> ()
+}) : () -> ()
+ 
+
+
+  serialized to /Users/cero/Code/gpucheck/.claude/teams/audit/v1.1/EVIDENCE/raw/06-mtl-capture/slow-1024-cold.mpsgraphpackage
+  slow runtime ms: [6.94, 3.24, 3.21, 3.21, 3.24, 3.19, 3.18, 3.2]
+
+=== fast-1024-after-off: graph=<MPSGraph: 0x84eb6c0e0> ===
+  compilation desc methods: ['setAccessibilityBrailleMapRenderRegion_', 'setAccessibilityBrailleMapRenderer_', 'setAllowedComputeDevices_', 'setAneCompilerSpatialSplitting_', 'setCallables_', 'setCompilationCompletionHandler_', 'setCompilerOptions_', 'setConstantData_', 'setDisableShapeFolding_', 'setDispatchQueue_', 'setEnableANECHWRankPromotion_', 'setEnableANECValidationWorkflow_', 'setEnableANEFWToFWSignal_', 'setEnableANELateLatch_', 'setEnableCompileResourcesForPackage_', 'setEnableMLIRDiagnostics_', 'setEnableParallelEncode_', 'setEnableShapeEquivalence_', 'setEnableShapeShifterCache_', 'setEnableShapeShifter_', 'setEntryFunctionName_', 'setInputShapeRanges_', 'setLayoutConversionPassConfig_', 'setMaximumNumberOfParallelEncodingRegions_', 'setMinimumNumberOfOpsInParallelRegion_', 'setNilValueForKey_', 'setObservationInfo_', 'setObservation_forObservingKeyPath_', 'setOptimizationLevel_', 'setOptimizationProfile_']
+  compile time: 0.67 ms
+  executable: <MPSGraphExecutable: 0x10310e590>
+  executable type: MPSGraphExecutable
+  exe methods (filtered):
+    accessibilityParameterizedAttributeNames
+    applyEntryPointToSymbolAndFileNameMap_device_compilationDescriptor_
+    applyInputTypes_toFunction_
+    applyOptimizationPassesWithDevice_module_compilationID_compilationDescriptor_perEntryPointFuncOpMLIRName_
+    applyOptionsToEntryPoint_compilationDescriptor_
+    ax_prettyDescription
+    checkSpecializationValidForSingleEntry
+    classDescription
+    classDescriptionForDestinationKey_
+    className
+    cloneForFeeds_targetTensors_targetOperations_compilationDescriptor_
+    commonPreInitWithDescriptor_
+    convertMPSGraphShapesToMLIRTypes_funcOp_compilationDescriptor_
+    createMetalPackageAtURL_descriptor_
+    debugDescription
+    description
+    dump
+    dumpArrayOfTensorData_basePath_separator_invocationCount_
+    dumpCompiledProducts
+    dumpModuleWithEV_
+    emitViewerSPIWithDevice_inputShapes_compilationDescriptor_
+    encodeToCommandBuffer_inputsArray_resultsArray_executionDescriptor_
+    encodeWithMPSCommandBuffer_inputsArray_resultsArray_executionDescriptor_
+    entityName
+    functionNames
+    getAttributesFromDescriptors_context_deviceDescriptor_
+    getDeviceCacheKeyForEntryPoint_device_compilationDescriptor_
+    getDeviceCacheKeyForTransformedEntryPointImpl_deviceDescriptor_compilationDescriptor_
+    getDeviceCacheKeyForTransformedEntryPoint_device_compilationDescriptor_
+    getFunctionReflectionData
+    getInputShapesForFunction_
+    getInputShapesForFunction_error_
+    getNewRuntimeForDevice_specializedModule_shapedEntryPoints_compilationDescriptor_
+    getNoDeviceCacheKeyForTransformedEntryPoint_compilationDescriptor_
+    getOutputShapesForFunction_
+    getOutputTypesWithDevice_entryPoint_compilationDescriptor_
+    getOutputTypesWithDevice_inputTypes_compilationDescriptor_
+    getOutputTypesWithDevice_shapedEntryPoint_compilationDescriptor_
+    getRuntimeSpecializationAndEntryFunction_shapedEntryPoint_perEntryPointToSymbolAndFileNameMap_cacheSpecializedModuleLookups_entryFuncOp_runtime_
+    getStateInputPositionsWithEntryFunctionName_
+    getTensorDataArraysWithDevice_feedsDictionary_resultsDictionary_inputsArray_resultsArray_executableExecutionDescriptor_
+    handleFailoversForClassNamed_
+    initWithCoreMLPackageAtURL_compilationDescriptor_
+    initWithCoreMLPackage_executableDescriptor_
+    initWithGraph_device_feeds_targetTensors_targetOperations_executableDescriptor_
+    initWithMILProgramWithURL_executableDescriptor_
+    initWithMILProgram_executableDescriptor_
+    initWithMLIRBytecode_executableDescriptor_
+    initWithMLIRCommon_executableDescriptor_error_
+    initWithMLIRCoreML_executableDescriptor_error_
+    initWithMLIRModule_executableDescriptor_
+    initWithMLIRSourceFromURL_executableDescriptor_
+    initWithMLIRSource_executableDescriptor_
+    initWithMPSGraphPackageAtURLCommon_compilationDescriptor_error_
+    initWithMPSGraphPackageAtURL_adapterExecutable_compilationDescriptor_
+    initWithMPSGraphPackageAtURL_compilationDescriptor_
+    initWithSpecializedMLIRModule_device_shapedEntryPoint_compilationDescriptor_executableDescriptor_
+    initializeFuncNamesInOriginalModule
+    initializeWithMLIRModule_executableDescriptor_
+    inputNamesForFuncOp_
+    inputNamesForFunction_
+    isExecutableForFeeds_targetTensors_targetOperations_compilationDescriptor_
+    lazyInitWithModuleURL_executableDescriptor_callablesDescription_moduleResourcesLoader_
+    methodDescriptionForSelector_
+    newExecutableWithDevice_inputsArray_intermediateOperations_executionDescriptor_
+    objectSpecifier
+    optimizedBytecodeForAllExistingSpecializations
+    optimizedBytecode_entryPoint_compilationDescriptor_
+    optimizedBytecode_inputShapes_compilationDescriptor_
+    optionDescriptionsForBinding_
+    outputNamesForFuncOp_
+    outputNamesForFunction_
+    resourceBlob_resourceName_error_
+    returnOpForFunctionInModule_
+    runAsyncWithCommandQueue_inputsArray_resultsArray_executionDescriptor_
+    runAsyncWithDevice_inputsArray_resultsArray_executionDescriptor_
+    runAsyncWithMTLCommandQueue_inputsArray_resultsArray_executionDescriptor_
+    runInternalWithDevice_commandBuffer_feedsDictionary_resultsDictionary_executableExecutionDescriptor_mpsGraphOwnedCommandBuffer_
+    runInternalWithDevice_commandBuffer_feeds_results_executableExecutionDescriptor_mpsGraphOwnedCommandBuffer_
+    runWithDevice_inputsArray_intermediateOperations_resultsArray_executionDescriptor_
+    runWithDevice_inputsArray_resultsArray_executionDescriptor_
+    runWithMTLCommandQueue_inputsArray_resultsArray_executionDescriptor_
+    safeSwiftCallAsFunction_
+    scriptingValueForSpecifier_
+    sendANEStreamingSessionSignal_sessionDescriptor_report_
+    serializeOptimizedBytecode_signature_bytecodeDictionary_
+    serializeToMPSGraphPackageAtURL_descriptor_
+    specializeForMultipleInputTypesWithDevice_multipleInputTypes_compilationDescriptor_
+    specializeWithDevice_entryPoints_compilationDescriptor_
+    specializeWithDevice_entryPoints_compilationDescriptor_error_
+    specializeWithDevice_inputShapes_compilationDescriptor_
+    specializeWithDevice_inputTypes_compilationDescriptor_
+    specializeWithDevice_shapedEntryPoint_compilationDescriptor_
+    specializeWithDevice_shapedEntryPoints_compilationDescriptor_error_
+    specializedModuleWithDevice_shapedEntryPoints_compilationDescriptor_error_
+    unloadEntryPointToSymbolAndFileNameMap_device_compilationDescriptor_
+    valueWithName_inPropertyWithKey_
+  exe debug:
+<MPSGraphExecutable: 0x10310e590> : 
+
+IR: #loc2 = loc("(mpsFileLoc): /AppleInternal/Library/BuildRoots/4~CKOougDLIumVT7yTlHqeQahAOsLoT_pOj6L2VoE/Library/Caches/com.apple.xbs/TemporaryDirectory.ZOD9bx/Sources/MetalPerformanceShadersGraph/mpsgraph/MetalPerformanceShadersGraph/Core/Files/MPSGraphUtilities.mm":3196:0)
+module {
+  func.func @main(%arg0: tensor<1024x1024xf32> loc("(mpsFileLoc): /AppleInternal/Library/BuildRoots/4~CKOougDLIumVT7yTlHqeQahAOsLoT_pOj6L2VoE/Library/Caches/com.apple.xbs/TemporaryDirectory.ZOD9bx/Sources/MetalPerformanceShadersGraph/mpsgraph/MetalPerformanceShadersGraph/Core/Files/MPSGraphUtilities.mm":3196:0), %arg1: tensor<1024x1024xf32> loc("(mpsFileLoc): /AppleInternal/Library/BuildRoots/4~CKOougDLIumVT7yTlHqeQahAOsLoT_pOj6L2VoE/Library/Caches/com.apple.xbs/TemporaryDirectory.ZOD9bx/Sources/MetalPerformanceShadersGraph/mpsgraph/MetalPerformanceShadersGraph/Core/Files/MPSGraphUtilities.mm":3196:0)) -> tensor<1024x1024xf32> {
+    %0 = "mps.matmul"(%arg0, %arg1) <{transpose_lhs = false, transpose_rhs = false}> : (tensor<1024x1024xf32>, tensor<1024x1024xf32>) -> tensor<1024x1024xf32> loc(#loc4)
+    return %0 : tensor<1024x1024xf32> loc(#loc2)
+  } loc(#loc1)
+} lo
+  graph debug FULL:
+<MPSGraph: 0x84eb6c0e0> : 
+
+IR: "builtin.module"() ({
+  "func.func"() <{function_type = () -> (), sym_name = "main"}> ({
+    %0 = "mps.placeholder"() : () -> tensor<1024x1024xf32>
+    %1 = "mps.placeholder"() : () -> tensor<1024x1024xf32>
+    %2 = "mps.matmul"(%0, %1) <{transpose_lhs = false, transpose_rhs = false}> : (tensor<1024x1024xf32>, tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
+  }) : () -> ()
+}) : () -> ()
+ 
+
+
+  serialized to /Users/cero/Code/gpucheck/.claude/teams/audit/v1.1/EVIDENCE/raw/06-mtl-capture/fast-1024-after-off.mpsgraphpackage
+  fast runtime ms: [1.55, 1.26, 1.12, 1.22, 1.28, 1.29, 1.24, 1.25]
+
+=== DIFF: slow exe vs fast exe ===
+  slow exe ptr: <MPSGraphExecutable: 0x103103150>
+  fast exe ptr: <MPSGraphExecutable: 0x10310e590>
+  slow == fast: False
+  slow type: MPSGraphExecutable
+  fast type: MPSGraphExecutable

@@ -12,15 +12,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **MPS Event-API deadlock probe (T-26, `gpucheck.diagnostics`).** New
+  `probe_mps_event_deadlock(timeout_ms=2000)` and
+  `assert_no_event_deadlock(timeout_ms=2000)` helpers detect the
+  unfixed [pytorch#162872](https://github.com/pytorch/pytorch/issues/162872)
+  deadlock between `torch.mps.event.Event.synchronize()` and
+  `Event.elapsed_time()`. The probe runs the unsafe trigger pattern in
+  a daemon thread with a hard timeout — `"healthy"` if the pattern
+  returns, `"deadlocked"` if the daemon hangs past the timeout,
+  `"skipped"` on hosts without an MPS-capable PyTorch build. Verified
+  against `aten/src/ATen/mps/MPSEvent.mm` HEAD on 2026-05-01: PR
+  #162874's one-line fix was closed without merge, so the geometry
+  remains intact in mainline PyTorch. Users on M-silicon CI can wire
+  the bundled `mps_event_deadlock_status_fixture` into a session-scoped
+  fixture to xfail tests that depend on working `Event.elapsed_time`
+  without re-running the probe per test.
 - **`@requires_arch` decorator (T-21).** Plural-form alias of
   `@require_arch`, matching the existing `@requires_determinism`
   spelling. Importable from `gpucheck.arch` (or
   `gpucheck.arch.compatibility`). The new name is the canonical form
   going forward.
+- Added Apple Silicon tile-size aware fuzzing (8/16/64/128) for MPS
+  device path; CUDA path unchanged.
+- Expanded `[tool.gpucheck.mps.xfail]` from 12 to 43 entries (31 new
+  bugs catalogued from PyTorch issue tracker R3 long-tail audit).
+- **Mutation-killer test suite (T-11 / T-12 / T-13).** New
+  `tests/test_mutation_killers.py` adds three high-leverage clusters
+  driven by the v1.1 mutmut audit
+  (`.claude/teams/audit/v1.1/EVIDENCE/mutator-survivors.md`):
+  exact-value pinning of every numeric field rendered by
+  `format_mismatch_report` (kills ~30 reporting.py mutants whose
+  existing tests only did substring checks), end-to-end round-trip
+  coverage of the `apply_config_tolerances` /
+  `tolerances_from_config` / `reset_config_tolerances` config-loader
+  path (kills ~17 tolerances.py mutants previously without any direct
+  test), and a hard-coded `pytest.parametrize` over
+  `_DEFAULT_TOLERANCES` that supersedes the tautological
+  dict-iterates-itself loop (kills ~12 dict-value mutants). No source
+  changes — pure test additions that raise the mutmut kill-rate floor
+  for `src/gpucheck/assertions/` from 42.7 % toward ~69 %.
+- **Per-(kernel-class, dtype) MPS tolerance overlay (T-24).**
+  `compute_tolerance(...)` now accepts an optional `kernel_class:
+  KernelClass | None = None` keyword. When supplied alongside
+  `device_type="mps"`, the multiplier is resolved from the new
+  `_MPS_KERNEL_DTYPE_MULTIPLIERS` table, calibrated from the v1.1
+  5K-iter Apple-M5 measurement campaign
+  (`.claude/teams/audit/v1.1/drift_histogram_5k.json`,
+  `EVIDENCE/calibration-final.md`).
+  - **MATMUL**: 16× / 20× / 32× for fp32 / fp16 / bf16 (covers the
+    measured P99 of 13.4× / 17.7× / 27.6× with safety; bf16 P99.9 of
+    31.91× sits exactly at the 32× ceiling).
+  - **CONV2D**: 4× / 8× / 12× for fp32 / fp16 / bf16 — revised upward
+    from the v3 200-iter projection. The 5K data shows fp32
+    P99.9=2.52× crosses the FlashAttention-2× ceiling (the new fp32 4×
+    overlay is the first to cover it), fp16 P99=6.71×, bf16 P99=10.44×.
+  - **NORM / REDUCTION / POINTWISE**: 2.0× across all dtypes via the
+    new `*` dtype-wildcard rows — confirms the FA-2× precedent at
+    5K-iter measurement for norm-protected and pointwise kernels.
+  - The new `KernelClass` `str`-Enum
+    (`MATMUL` / `CONV2D` / `NORM` / `REDUCTION` / `POINTWISE` /
+    `DEFAULT`) is exported from `gpucheck.assertions`.
+  - **Backward-compat**: omitting `kernel_class` (or passing
+    `kernel_class=None`) reproduces the v1.0 flat
+    `_MPS_TOLERANCE_MULTIPLIERS` lookup byte-for-byte; v1.0 callers
+    require no source change.
 
 ### Changed
 
-- *(reserved for post-1.0 work)*
+- **`compute_tolerance()` MPS overlay routing (T-24).** When
+  `kernel_class` is supplied, the multiplier resolution order is:
+  (1) exact `(kernel_class, dtype)` row, (2) `(kernel_class, "*")`
+  wildcard row, (3) reserved `(KernelClass.DEFAULT, dtype)` row,
+  (4) flat `_MPS_TOLERANCE_MULTIPLIERS[dtype]` (v1.0 path), (5) hard
+  2.0 fallback. Omitting `kernel_class` skips steps 1-3, preserving
+  v1.0 byte-identical behaviour.
+- The PROVISIONAL note on `_MPS_TOLERANCE_MULTIPLIERS` (v1.0 docstring
+  flagged it pending M-machine calibration) is retired: v1.1 ships the
+  calibration. The flat table is now the documented DEFAULT
+  kernel-class fallback for the per-(kernel_class, dtype) overlay.
 
 ### Deprecated
 

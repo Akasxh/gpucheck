@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gpucheck"
-version = "1.0.0"
+version = "1.1.0.dev0"
 description = "pytest for GPU kernels — correctness, benchmarking, and fuzzing for CUDA, MPS, and Triton"
 readme = "README.md"
 license = "Apache-2.0"
@@ -106,9 +106,10 @@ ignore_missing_imports = true
 # crash bugs in PyTorch's MPS backend.
 #
 # Re-mine the issue tracker each minor release; bugs that close should be
-# removed, and new ones added.
+# removed, and new ones added. Last re-mine: 2026-05-01 (Round 3 long-tail).
 [tool.gpucheck.mps.xfail]
 ops = [
+  # ============= v1 list (12 entries, retained from Round 1) =============
   # SDPA correctness on large B×S — pytorch#179352
   "scaled_dot_product_attention.large",
   # SDPA backward goes through the math-decomposition backend — pytorch#179294
@@ -133,6 +134,101 @@ ops = [
   "BCE_loss",
   # Catastrophic gradient corruption when total elements > 32K — pytorch#177116
   "matmul.backward.over_32K_elements",
+
+  # ============= v1.1 additions (Round 2/3 long-tail mining) =============
+  # --- Tier 1: silent-correctness, recent, no workaround ---
+  # aten::copy_ into strided view silently wraps writes at element offset > 2^32 — pytorch#182052 (2026-04-30)
+  "copy_.strided_view_offset_2pow32_wrap",
+  # avg_pool1d returns negative values from non-negative input when zeros follow large floats — pytorch#179608 (2026-04-13)
+  "avg_pool1d.prefix_sum_drift_long_seq",
+  # scatter_add_ silent no-op on slice with offset > 0 — pytorch#163327 (2026-01-30)
+  "scatter_add_.nonzero_offset_slice",
+  # Voxtral ASR transcription produces gibberish on MPS — pytorch#162092 (2025-12-07)
+  "model.voxtral_asr_full_pipeline",
+  # AdaptiveMaxPool{1,2}d under torch.compile produces incorrect results — pytorch#169738 (2025-12-09)
+  "adaptive_max_pool.inductor_compile",
+  # conv2d on chunked view returns wrong batched output — pytorch#169342 (2025-12-09)
+  "conv2d.chunk_view_input",
+  # float16 → float32 conversion zeros large matrices > 43000² — pytorch#154322 (2025-05-25)
+  "dtype.fp16_to_fp32_large_matrix_zero",
+
+  # --- Tier 2: silent-OOB-zero family (5 entries, indexing) ---
+  # nn.Embedding / index_select OOB returns 0 instead of raising — pytorch#144824 (2025-10-10)
+  "embedding.oob_index_silent_zero",
+  # index_select / nn.Embedding OOB undetected — pytorch#154235 (2025-12-02)
+  "index_select.oob_index_silent",
+  # F.one_hot silently fails (returns zeros) on OOB/neg indices — pytorch#170507 (2025-12-16)
+  "one_hot.oob_neg_index_silent",
+  # F.one_hot inconsistent when target > num_classes — pytorch#163504 (2025-12-27)
+  "one_hot.target_exceeds_num_classes",
+  # __getitem__ OOB silent wrap/zero on advanced index — pytorch#160553 (2025-12-02)
+  "getitem.oob_advanced_index_silent",
+
+  # --- Tier 3: validation-missing family (3 entries) ---
+  # nn.EmbeddingBag does not check offsets[0] like CPU — pytorch#170370 (2025-12-20)
+  "embedding_bag.offsets0_validation_missing",
+  # ConvTranspose{1,2,3}d ignore output_padding < stride validation — pytorch#169236 (2025-11-30)
+  "conv_transpose.output_padding_validation_missing",
+  # F.fold lacks input validation — pytorch#170639 (2025-12-17)
+  "fold.input_validation_missing",
+
+  # --- Tier 4: NaN / numerical drift (5 entries) ---
+  # MultiheadAttention with masks and dropout produces NaNs — pytorch#151667 (2025-06-28)
+  "multihead_attention.mask_dropout_nan",
+  # MPS memory operation corrupted under memory pressure — pytorch#132086 (2024-08-05)
+  "general.memory_pressure_corruption",
+  # F.linear non-negligible error when input large (b=9, in=1024, out=50304) — pytorch#122045 (2025-07-29)
+  "F.linear.large_input_drift",
+  # FFT + Adam training drift CPU vs MPS — pytorch#151740 (2025-07-08)
+  "fft.adam_training_drift",
+  # autograd / matmul backward gradient drift on large shapes — pytorch#153957 (2025-05-29)
+  "autograd.large_shape_grad_drift",
+
+  # --- Tier 5: copy_ / argmax / clamp edge cases (5 entries) ---
+  # copy_ wrong on multi-element input edge case — pytorch#160744 (2025-10-26)
+  "copy_.multi_element_edge_case",
+  # copy_ wrong for boolean tensors — pytorch#121439 (2025-07-29)
+  "copy_.bool_dtype",
+  # argmax/argmin wrong on non-contiguous input — pytorch#160740 (2025-08-15)
+  "argmax.non_contiguous",
+  # argmax/argmin NaN handling differs from CPU — pytorch#130295 (2025-07-24)
+  "argmax.nan_handling",
+  # clamp_ vs clamp diverge — pytorch#147510 (2025-02-21)
+  "clamp.inplace_vs_outofplace",
+
+  # --- Tier 6: backward / functorch / specialty (4 entries) ---
+  # conv1d backward via functorch gradient drift — pytorch#119677 (2025-01-24)
+  "conv1d.functorch_backward_drift",
+  # Hardswish channels_last vs first input grad mismatch — pytorch#107214 (2025-06-17)
+  "hardswish.channels_last_backward_drift",
+  # lgamma changes results when broadcasting — pytorch#132605 (2025-01-03)
+  "lgamma.broadcasting_drift",
+  # GRU outputs NaN on MPS — pytorch#94691 (2025-01-09)
+  "gru.nan_output",
+
+  # --- Tier 7: rank-5 crashes & dispatcher gaps (4 entries) ---
+  # batch_norm crash on mixed dtype (fp16 input + fp32 stats) — pytorch#154887 (2025-10-28)
+  "batch_norm.mixed_dtype_crash",
+  # cumsum crash on 5D+ tensor — pytorch#154881 (2025-08-12)
+  "cumsum.rank_5_plus_crash",
+  # topk crash on 5D+ tensor — pytorch#154890 (2025-08-12)
+  "topk.rank_5_plus_crash",
+  # max_pool2d (return_indices=True) length-mismatch crash — pytorch#154882 (2025-06-02)
+  "max_pool2d.return_indices_crash",
+
+  # --- Tier 8: hard crashes & specialty correctness (6 entries) ---
+  # libomp.dylib SEGFAULT after torch.matmul on M4 Max — pytorch#161865 (2025-09-10)
+  "matmul.libomp_segfault_m4_max",
+  # torch.mps.synchronize hangs on error — pytorch#144634 (2026-01-20)
+  "synchronize.hang_on_error",
+  # conv_transpose3d wrong output for inf-weights — pytorch#164125 (2025-09-29)
+  "conv_transpose3d.inf_weight",
+  # linalg.solve_triangular missing device check → hard crash — pytorch#142048 (2026-03-14)
+  "solve_triangular.device_check_missing_crash",
+  # torch.multinomial samples outside distribution domain — pytorch#136623 (2025-12-15)
+  "multinomial.out_of_domain_sample",
+  # [MPS] generic wrong calc, no minimal repro upstream — pytorch#122030 (2025-11-21)
+  "general.wrong_calc_unspecified",
 ]
 
 [tool.mutmut]

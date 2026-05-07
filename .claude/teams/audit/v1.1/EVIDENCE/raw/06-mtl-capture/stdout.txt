@@ -1,0 +1,17 @@
+2026-05-07 17:18:56.572 python[75888:8664848] Metal API Validation Enabled
+2026-05-07 17:18:56.572 python[75888:8664848] Metal GPU Validation Enabled
+PID=75888
+==== PHASE 1 SLOW 1024 fp32 ====
+[slow-0] 172.872 ms
+[slow-1] 5.968 ms
+[slow-2] 2.000 ms
+[slow-3] 2.018 ms
+[slow-4] 1.987 ms
+==== PHASE 2 OFF-SHAPE 2048 fp32 ====
+[offshape-0] 22.401 ms
+==== PHASE 3 FAST 1024 fp32 ====
+[fast-0] 2.121 ms
+[fast-1] 1.968 ms
+[fast-2] 1.909 ms
+[fast-3] 1.914 ms
+[fast-4] 1.961 ms

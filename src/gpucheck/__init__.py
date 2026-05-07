@@ -37,6 +37,14 @@ _LAZY_MAP: dict[str, tuple[str, str]] = {
     "available_backends": ("gpucheck.backends", "available_backends"),
     "get_backend": ("gpucheck.backends", "get_backend"),
     "Backend": ("gpucheck.backends", "Backend"),
+    "probe_mps_event_deadlock": (
+        "gpucheck.diagnostics.mps_event_deadlock",
+        "probe_mps_event_deadlock",
+    ),
+    "assert_no_event_deadlock": (
+        "gpucheck.diagnostics.mps_event_deadlock",
+        "assert_no_event_deadlock",
+    ),
 }
 
 
@@ -94,6 +102,8 @@ __all__ = [
     "available_backends",
     "get_backend",
     "Backend",
+    "probe_mps_event_deadlock",
+    "assert_no_event_deadlock",
     "FLOAT_DTYPES",
     "HALF_DTYPES",
     "ALL_DTYPES",
