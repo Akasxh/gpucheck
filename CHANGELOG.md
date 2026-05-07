@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   going forward.
 - Added Apple Silicon tile-size aware fuzzing (8/16/64/128) for MPS
   device path; CUDA path unchanged.
+- Expanded `[tool.gpucheck.mps.xfail]` from 12 to 43 entries (31 new
+  bugs catalogued from PyTorch issue tracker R3 long-tail audit).
 
 ### Changed
 
