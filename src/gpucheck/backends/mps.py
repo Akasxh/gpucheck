@@ -37,6 +37,7 @@ shares a single source of truth.
 
 from __future__ import annotations
 
+import logging
 import platform
 import subprocess
 import time
@@ -49,6 +50,8 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
     from gpucheck.arch.detection import GPUInfo
+
+logger = logging.getLogger(__name__)
 
 
 def _torch() -> Any:
@@ -96,7 +99,8 @@ class MPSBackend:
         if callable(fn):
             try:
                 return int(fn())
-            except Exception:
+            except (RuntimeError, AttributeError) as exc:
+                logger.debug("torch.mps.device_count() failed: %s; falling back to 1", exc)
                 return 1
         return 1
 
@@ -134,18 +138,21 @@ class MPSBackend:
         stats: dict[str, int] = {}
         try:
             stats["used"] = int(torch.mps.current_allocated_memory())
-        except Exception:
+        except (RuntimeError, AttributeError) as exc:
+            logger.debug("torch.mps.current_allocated_memory() failed: %s", exc)
             stats["used"] = 0
         try:
             stats["driver_allocated"] = int(torch.mps.driver_allocated_memory())
-        except Exception:
+        except (RuntimeError, AttributeError) as exc:
+            logger.debug("torch.mps.driver_allocated_memory() failed: %s", exc)
             stats["driver_allocated"] = 0
         # recommended_max_memory exists on 2.6+
         rec_fn = getattr(torch.mps, "recommended_max_memory", None)
         if callable(rec_fn):
             try:
                 stats["total"] = int(rec_fn())
-            except Exception:
+            except (RuntimeError, AttributeError) as exc:
+                logger.debug("torch.mps.recommended_max_memory() failed: %s", exc)
                 stats["total"] = 0
         else:
             stats["total"] = 0
@@ -187,7 +194,10 @@ class MPSBackend:
         if callable(rec_fn):
             try:
                 total_bytes = int(rec_fn())
-            except Exception:
+            except (RuntimeError, AttributeError) as exc:
+                logger.debug(
+                    "torch.mps.recommended_max_memory() failed in arch_info: %s", exc,
+                )
                 total_bytes = 0
         else:
             total_bytes = 0

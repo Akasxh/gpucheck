@@ -154,7 +154,8 @@ def _detect_via_pynvml() -> list[GPUInfo] | None:
             cuda_major = cuda_ver_int // 1000
             cuda_minor = (cuda_ver_int % 1000) // 10
             cuda_version = f"{cuda_major}.{cuda_minor}"
-        except Exception:
+        except (pynvml.NVMLError, AttributeError) as exc:
+            logger.debug("pynvml CUDA driver version probe failed: %s", exc)
             cuda_version = ""
 
         device_count = pynvml.nvmlDeviceGetCount()
@@ -226,7 +227,8 @@ def _detect_via_torch() -> list[GPUInfo] | None:
             torch.cuda.set_device(i)
             free_bytes, _total = torch.cuda.mem_get_info(i)
             free_mb = free_bytes // (1024 * 1024)
-        except Exception:
+        except (RuntimeError, AttributeError) as exc:
+            logger.debug("torch.cuda.mem_get_info(%d) failed: %s; using total as free", i, exc)
             free_mb = total_mb  # best guess
 
         if hasattr(props, "max_shared_memory_per_block"):
