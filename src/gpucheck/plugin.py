@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import Any
 
 import pytest
@@ -56,36 +57,48 @@ def pytest_configure(config: pytest.Config) -> None:
 def _load_pyproject_config(rootpath: Any) -> None:
     """Read ``pyproject.toml`` and apply gpucheck's tool sections.
 
-    Silent on failure — if the file is absent or unparseable, gpucheck falls
-    back to its built-in defaults. Uses stdlib ``tomllib`` (Python 3.11+) or
-    ``tomli`` (3.10) — both ship with the python toolchain we target.
-    """
-    try:
-        from pathlib import Path as _Path
+    Best-effort — if the file is absent gpucheck falls back to its built-in
+    defaults. If the file exists but is unreadable or malformed, a
+    :class:`UserWarning` is emitted so the user sees the misconfiguration
+    rather than silently shipping defaults (security finding PM-2).
 
-        pyproject = _Path(str(rootpath)) / "pyproject.toml"
-        if not pyproject.is_file():
-            return
-        # Python 3.11+ ships tomllib in the stdlib; 3.10 needs `tomli`.
-        # Both modules import as a name local to this function — mypy's
-        # static view doesn't know which Python we'll actually run on, so
-        # the import errors are silenced via the broad mypy override below.
-        try:
-            import tomllib
-        except ModuleNotFoundError:  # pragma: no cover  -- 3.10 fallback
-            import tomli as tomllib  # type: ignore[no-redef,unused-ignore]
+    Uses stdlib ``tomllib`` (Python 3.11+) or ``tomli`` (3.10) — both ship with
+    the python toolchain we target.
+    """
+    from pathlib import Path as _Path
+
+    pyproject = _Path(str(rootpath)) / "pyproject.toml"
+    if not pyproject.is_file():
+        return
+
+    # Python 3.11+ ships tomllib in the stdlib; 3.10 needs `tomli`.
+    # Both modules import as a name local to this function — mypy's
+    # static view doesn't know which Python we'll actually run on, so
+    # the import errors are silenced via the broad mypy override below.
+    try:
+        import tomllib
+    except ModuleNotFoundError:  # pragma: no cover  -- 3.10 fallback
+        import tomli as tomllib  # type: ignore[no-redef,unused-ignore]
+
+    try:
         with pyproject.open("rb") as f:
             data = tomllib.load(f)
-        from gpucheck.assertions.tolerances import (
-            apply_config_tolerances,
-            apply_mps_xfail_config,
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        warnings.warn(
+            f"gpucheck: failed to load {pyproject} ({type(exc).__name__}: {exc}); "
+            "falling back to built-in tolerance defaults.",
+            UserWarning,
+            stacklevel=2,
         )
+        return
 
-        apply_config_tolerances(data)
-        apply_mps_xfail_config(data)
-    except Exception:
-        # Configuration is best-effort; never block the test session.
-        pass
+    from gpucheck.assertions.tolerances import (
+        apply_config_tolerances,
+        apply_mps_xfail_config,
+    )
+
+    apply_config_tolerances(data)
+    apply_mps_xfail_config(data)
 
 
 def pytest_collection_modifyitems(
