@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   spelling. Importable from `gpucheck.arch` (or
   `gpucheck.arch.compatibility`). The new name is the canonical form
   going forward.
+- Added Apple Silicon tile-size aware fuzzing (8/16/64/128) for MPS
+  device path; CUDA path unchanged.
 
 ### Changed
 
