@@ -265,10 +265,13 @@ v1 adds a 7-category stride corpus at `src/gpucheck/fuzzing/strides.py`:
 from gpucheck.fuzzing import fuzz_strides, fuzz_strides_for_category, STRIDE_CATEGORIES
 
 # Deterministic corpus across all categories
-strides = fuzz_strides(shape=(8, 16, 32), n=20, seed=42)
+strides = fuzz_strides(shape=(8, 16, 32), dtype=torch.float32, seed=42)
 
-# One specific category
-broadcast = fuzz_strides_for_category("broadcast-induced", shape=(8, 16, 32))
+# One specific category (snake_case is canonical; kebab-case aliases
+# such as "broadcast-induced" are accepted with a DeprecationWarning).
+broadcast = fuzz_strides_for_category(
+    shape=(8, 16, 32), dtype=torch.float32, category="broadcast",
+)
 
 # Hypothesis property-based testing
 from gpucheck.fuzzing import StrideStrategy
@@ -284,13 +287,16 @@ from gpucheck import parametrize_gpu
     dtypes=("float32",),
     shapes=((8, 16, 32),),
     devices=("cuda:0",),
-    stride_categories=("row-major", "transpose", "broadcast-induced"),
+    stride_categories=("row_major", "transpose", "broadcast"),
 )
 def test_my_kernel(dtype, shape, device, stride_category, stride): ...
 ```
 
-The 7 categories: `row-major`, `column-major`, `broadcast-induced`,
-`transpose`, `slice`, `contiguous-after-clone`, `gather-induced`.
+The 7 categories (canonical snake_case): `row_major`, `column_major`,
+`broadcast`, `transpose`, `slice`, `non_contig`, `gather`. The previous
+kebab-case spellings (`row-major`, `broadcast-induced`,
+`contiguous-after-clone`, `gather-induced`) are still accepted but emit
+a `DeprecationWarning` and route to the snake_case form.
 
 Pre-v1.0, the project documented this gap as "No stride/contiguity
 fuzzing (only shapes and values)" in `CLAUDE.md` "Known Weaknesses".

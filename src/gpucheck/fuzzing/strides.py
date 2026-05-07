@@ -6,7 +6,7 @@ view, a broadcast-induced stride-0 dim, or a slice with non-unit stride.
 This module generates a deterministic corpus of seven stride categories,
 plus a Hypothesis :class:`StrideStrategy` for property-based testing.
 
-Categories (priority order; row-major first as the baseline)::
+Categories (priority order; row_major first as the baseline)::
 
     row_major     -- contiguous, default torch.empty(shape)
     column_major  -- ATen 'F' layout via transpose-of-contiguous
@@ -15,6 +15,13 @@ Categories (priority order; row-major first as the baseline)::
     slice         -- regular non-unit stride (every-other)
     non_contig    -- view that is non-contiguous AND not a clean transpose
     gather        -- irregular access (gather-induced stride pattern)
+
+The canonical names are snake_case (Python convention). Earlier docs used
+kebab-case (``row-major``, ``broadcast-induced``); those forms are
+accepted by :func:`fuzz_strides_for_category` and
+:func:`fuzz_strides` for backward compatibility, but emit a
+:class:`DeprecationWarning` and route through the canonical name. See
+:func:`_canonicalize_category` for the alias table.
 
 Each category is independently chosen because each exercises a different
 code path inside PyTorch's kernel dispatcher. A v1.0 test that passes
@@ -28,6 +35,7 @@ the rest of ``gpucheck.fuzzing``.
 
 from __future__ import annotations
 
+import warnings
 from typing import Any
 
 CATEGORIES: tuple[str, ...] = (
@@ -39,6 +47,46 @@ CATEGORIES: tuple[str, ...] = (
     "non_contig",
     "gather",
 )
+
+# Kebab-case aliases used in earlier MIGRATION.md / CHANGELOG snippets.
+# Accepted with a DeprecationWarning so users who copy-pasted the old docs
+# don't hit ``ValueError: Unknown stride category 'broadcast-induced'``.
+# Maps deprecated → canonical.
+_CATEGORY_ALIASES: dict[str, str] = {
+    "row-major": "row_major",
+    "column-major": "column_major",
+    "broadcast-induced": "broadcast",
+    # ``transpose`` and ``slice`` and ``gather`` are identical in both
+    # spellings, so they don't need entries here.
+    "non-contig": "non_contig",
+    "non-contiguous": "non_contig",
+    "contiguous-after-clone": "non_contig",
+    "gather-induced": "gather",
+}
+
+
+def _canonicalize_category(category: str) -> str:
+    """Return the canonical snake_case category name.
+
+    If ``category`` is a known kebab-case alias (review BLOCKER A1), emit
+    a :class:`DeprecationWarning` and return the canonical mapping. If
+    it's already canonical, return as-is. Unknown values are returned
+    unchanged so the caller's ``ValueError`` surfaces with the original
+    bad name.
+    """
+    if category in _CATEGORY_FN:
+        return category
+    canonical = _CATEGORY_ALIASES.get(category)
+    if canonical is None:
+        return category
+    warnings.warn(
+        f"Stride category {category!r} is deprecated; use "
+        f"{canonical!r} (snake_case is the canonical form). "
+        "kebab-case aliases will be removed in a future release.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+    return canonical
 
 
 def _torch_mod() -> Any:
@@ -194,7 +242,12 @@ def fuzz_strides_for_category(
 
     Use this when a test is parametrized over categories (typically via
     :func:`parametrize_gpu(stride_categories=...)`).
+
+    Both snake_case (canonical) and kebab-case (deprecated alias) names
+    are accepted; passing a kebab-case name emits a
+    :class:`DeprecationWarning`.
     """
+    category = _canonicalize_category(category)
     if category not in _CATEGORY_FN:
         raise ValueError(
             f"Unknown stride category {category!r}; "
@@ -236,7 +289,10 @@ def fuzz_strides(
         Override the default category order. Useful for tests that want
         only a subset (e.g. only the non-contiguous flavors).
     """
-    cats = tuple(categories) if categories else CATEGORIES
+    raw_cats = tuple(categories) if categories else CATEGORIES
+    # Normalize kebab-case aliases (review BLOCKER A1). _canonicalize_category
+    # emits DeprecationWarning per non-canonical name.
+    cats = tuple(_canonicalize_category(c) for c in raw_cats)
     invalid = [c for c in cats if c not in _CATEGORY_FN]
     if invalid:
         raise ValueError(

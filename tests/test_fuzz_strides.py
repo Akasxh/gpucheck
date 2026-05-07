@@ -131,3 +131,43 @@ def test_higher_rank_3d_smoke() -> None:
     out = fuzz_strides((4, 8, 16), torch.float32, seed=0)
     for _label, t in out:
         assert t.shape == (4, 8, 16)
+
+
+# ---------------------------------------------------------------------------
+# Kebab-case alias acceptance (review BLOCKER A1)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("alias", "canonical"),
+    [
+        ("row-major", "row_major"),
+        ("column-major", "column_major"),
+        ("broadcast-induced", "broadcast"),
+        ("non-contig", "non_contig"),
+        ("non-contiguous", "non_contig"),
+        ("contiguous-after-clone", "non_contig"),
+        ("gather-induced", "gather"),
+    ],
+)
+def test_fuzz_strides_for_category_accepts_kebab_alias(
+    alias: str, canonical: str,
+) -> None:
+    """Both kebab-case (deprecated) and snake_case names must work."""
+    with pytest.warns(DeprecationWarning, match=alias):
+        t_kebab = fuzz_strides_for_category((4, 4), torch.float32, alias, seed=0)
+    t_snake = fuzz_strides_for_category((4, 4), torch.float32, canonical, seed=0)
+    # Same seed, same shape, same dtype, alias-routed → same tensor.
+    assert torch.equal(t_kebab, t_snake)
+
+
+def test_fuzz_strides_accepts_kebab_aliases_in_categories() -> None:
+    """Same alias acceptance via the bulk ``fuzz_strides`` entrypoint."""
+    with pytest.warns(DeprecationWarning):
+        out = fuzz_strides(
+            (4, 4), torch.float32,
+            categories=("row-major", "broadcast-induced"),
+            seed=7,
+        )
+    # The returned labels are the *canonical* names, not the kebab aliases.
+    assert [c for c, _t in out] == ["row_major", "broadcast"]
