@@ -31,6 +31,12 @@ dependencies = [
     "pytest>=7.0",
     "rich>=13.0",
     "numpy>=1.24",
+    # Python 3.10 lacks `tomllib` in the stdlib; the plugin's
+    # `_load_pyproject_config` falls back to `tomli`. Without this declared
+    # dependency, a fresh `pip install gpucheck` on 3.10 silently no-ops the
+    # `[tool.gpucheck.tolerances]` and `[tool.gpucheck.mps.xfail]` overlays
+    # (review BLOCKER S1; configuration-trust failure).
+    'tomli>=2.0; python_version < "3.11"',
 ]
 
 [project.optional-dependencies]
@@ -128,3 +134,8 @@ ops = [
   # Catastrophic gradient corruption when total elements > 32K — pytorch#177116
   "matmul.backward.over_32K_elements",
 ]
+
+[tool.mutmut]
+paths_to_mutate = "src/gpucheck/"
+runner = "uv run pytest -x -q"
+tests_dir = "tests/"
