@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import gc
 import warnings
 from dataclasses import dataclass
@@ -12,6 +11,8 @@ import pytest
 
 if TYPE_CHECKING:
     from collections.abc import Generator
+
+    from gpucheck.arch.detection import GPUInfo
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,85 +41,37 @@ class GPUDevice:
         )
 
 
-def _detect_gpu_pynvml() -> GPUDevice | None:
-    """Detect GPU using pynvml (no torch dependency)."""
-    try:
-        import pynvml
-    except ImportError:
-        return None
+def _to_device(info: GPUInfo) -> GPUDevice:
+    """Adapt a richer ``arch.detection.GPUInfo`` into the local ``GPUDevice``.
 
-    try:
-        pynvml.nvmlInit()
-    except pynvml.NVMLError:
-        return None
-
-    try:
-        count = pynvml.nvmlDeviceGetCount()
-        if count == 0:
-            return None
-
-        handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-        name = pynvml.nvmlDeviceGetName(handle)
-        if isinstance(name, bytes):
-            name = name.decode("utf-8")
-
-        mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
-
-        # Compute capability
-        major = pynvml.nvmlDeviceGetCudaComputeCapability(handle)
-        if isinstance(major, tuple):
-            cc = (major[0], major[1])
-        else:
-            # Older pynvml versions return two separate values
-            minor = 0
-            cc = (major, minor)
-
-        return GPUDevice(
-            device_id=0,
-            name=name,
-            compute_capability=cc,
-            memory_total=mem_info.total,
-            memory_free=mem_info.free,
-        )
-    except pynvml.NVMLError:
-        return None
-    finally:
-        with contextlib.suppress(pynvml.NVMLError):
-            pynvml.nvmlShutdown()
-
-
-def _detect_gpu_torch() -> GPUDevice | None:
-    """Detect GPU using torch.cuda."""
-    try:
-        import torch
-    except ImportError:
-        return None
-
-    if not torch.cuda.is_available():
-        return None
-
-    try:
-        device_id = 0
-        props = torch.cuda.get_device_properties(device_id)
-        mem_free, mem_total = torch.cuda.mem_get_info(device_id)
-
-        return GPUDevice(
-            device_id=device_id,
-            name=props.name,
-            compute_capability=(props.major, props.minor),
-            memory_total=mem_total,
-            memory_free=mem_free,
-        )
-    except (RuntimeError, AssertionError):
-        return None
+    ``GPUInfo`` carries memory in MB; ``GPUDevice`` exposes raw bytes.
+    The 1MB granularity loss is acceptable for fixture-level reporting
+    (``__str__`` formats only to whole-MB anyway).
+    """
+    return GPUDevice(
+        device_id=info.device_id,
+        name=info.name,
+        compute_capability=info.compute_capability,
+        memory_total=info.memory_total_mb * 1024 * 1024,
+        memory_free=info.memory_free_mb * 1024 * 1024,
+    )
 
 
 def detect_gpu() -> GPUDevice | None:
-    """Auto-detect a GPU, preferring pynvml (lighter) over torch."""
-    device = _detect_gpu_pynvml()
-    if device is not None:
-        return device
-    return _detect_gpu_torch()
+    """Auto-detect a GPU, preferring pynvml (lighter) over torch.
+
+    Delegates to :func:`gpucheck.arch.detection.detect_gpus` so there is
+    exactly one detection codepath in the codebase (T-20); ``detect_gpus``
+    is ``lru_cache``-backed, so repeated calls are O(1) and the
+    "no detection backend available" warning fires at most once per session.
+    The first detected device is adapted to the ``GPUDevice`` shape.
+    """
+    from gpucheck.arch.detection import detect_gpus
+
+    gpus = detect_gpus()
+    if not gpus:
+        return None
+    return _to_device(gpus[0])
 
 
 def _cleanup_gpu() -> None:
