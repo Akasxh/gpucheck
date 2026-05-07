@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from gpucheck.assertions.close import assert_close
 from gpucheck.assertions.tolerances import (
+    KernelClass,
     apply_mps_xfail_config,
     compute_tolerance,
     is_mps_xfailed,
@@ -14,6 +15,7 @@ from gpucheck.assertions.tolerances import (
 )
 
 __all__ = [
+    "KernelClass",
     "assert_close",
     "compute_tolerance",
     "tolerance_context",
