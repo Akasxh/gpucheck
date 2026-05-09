@@ -461,6 +461,10 @@ pytest examples/shape_fuzzing_example.py -v
 pytest examples/benchmark_example.py -v
 ```
 
+## How this codebase is built
+
+gpucheck is developed by Claude Code operating as a multi-team agent workforce. The full methodology — paste-able session prompts, deltas between prompt versions, and per-session reports — lives at [`docs/agentic-development/`](./docs/agentic-development/). Read [`docs/agentic-development/README.md`](./docs/agentic-development/README.md) before opening a new Claude session in this repo.
+
 ## License
 
 Apache-2.0
