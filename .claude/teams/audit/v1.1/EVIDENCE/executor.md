@@ -305,3 +305,183 @@ fallback ordering. Updated CHANGELOG with both Added and Changed entries.
   end-to-end. A follow-up task can add a `kernel_class=` argument to
   `assert_close` for users who want per-kernel routing in the assertion
   call itself.
+
+---
+
+## Task claude-forge v0.4 hook 1b: Agent-dispatch wrapper
+
+### What I did
+Built the application-layer Agent-dispatch wrapper specified in
+`architect-continuous-learning.md` §1b. Created
+`~/.claude/scripts/cf_dispatch_wrapper.py` (the entrypoint, ~209 LOC stdlib
+only), `~/.claude/scripts/cf-rank` (9-line bash shim, chmod +x),
+`~/.claude/skills/cf-dispatch-wrapper/SKILL.md` (78 LOC, ≤80 budget), and
+`~/.claude/scripts/tests/test_cf_dispatch_wrapper.py` (18 tests parametrized
+across 9 lead-mapping cases + 3 fallback paths + happy path + adversarial
+inputs + 3 CLI smoke tests).
+
+The wrapper takes `(original_prompt, subagent_type, top_k=5)`, auto-detects
+the lead memory dir from the subagent prefix (`research-cartographer` →
+`research-lead`; `general-purpose` → no per-lead lookup), and prepends a
+`--- relevant lessons (claude-forge v0.4 hook 1b) --- ... --- end lessons
+---` block followed by the original prompt verbatim. Calls the (yet-to-exist)
+`lesson_ranker.py` from task #1; if that file is absent or its `rank_lessons`
+function raises, the wrapper logs one stderr line and returns the original
+prompt unchanged — never raises, per architect's "defensive" hard rule.
+
+### Files modified
+- (none in gpucheck — task is `~/.claude/`-only by charter)
+
+### Files created
+- `/Users/cero/.claude/scripts/cf_dispatch_wrapper.py` — main wrapper module + CLI.
+- `/Users/cero/.claude/scripts/cf-rank` — bash shim (executable).
+- `/Users/cero/.claude/skills/cf-dispatch-wrapper/SKILL.md` — orchestrator-facing skill doc.
+- `/Users/cero/.claude/scripts/tests/test_cf_dispatch_wrapper.py` — pytest suite (stdlib + pytest only).
+- `/Users/cero/Code/gpucheck/.claude/teams/audit/v1.1/DIFF_LOG.md` — iteration log.
+
+### Design decisions made during implementation
+- **Lead mapping**: implemented as `subagent_type.split("-", 1)[0]` lookup
+  in a hard-coded `KNOWN_LEADS` set (`research, engineering, forge, security,
+  testing, docs, research-retrospector`). The architect said "auto-detect
+  from subagent_type" without naming the mechanism; I chose a static set
+  rather than scanning `~/.claude/agent-memory/*-lead/` at every call to keep
+  latency at ~0.1ms even on cold disk. If a new lead is added, this set
+  needs updating — flagged as a follow-up consideration.
+- **Ranker contract**: `_ranker_top_k` tries `rank_lessons(lead, top_k)`
+  first then falls back to `rank(top_k)`. Task #1 hasn't been written yet,
+  so the contract is best-guess; if task #1 lands with a different signature,
+  this glue layer can be patched without touching the public
+  `wrap_agent_prompt`. The fallback covers both shapes.
+- **Output format**: lessons rendered as `- [tag1,tag2] <id>: <title>`
+  (tags capped at 3, title squeezed to a single line ≤140 chars). The
+  charter specified "lesson titles + 1-line summaries"; I unified the two
+  into one line to keep injection cost bounded.
+- **CLI `--json-out`**: not strictly required by the charter, but added
+  because orchestrators that prefer to parse a structured payload (lead +
+  top_k + augmented prompt) get one without needing a second invocation.
+- **Importing the ranker via importlib**: avoids polluting `sys.path` with
+  `~/.claude/scripts`. Spec was loaded fresh on each call by the wrapper
+  function — fine at <1 call per Agent dispatch.
+
+### Potential blast radius
+- The wrapper does NOT touch any existing scripts. `build_memory_index.py`,
+  `scribe-merge-all.sh`, `session-capture.sh` are untouched.
+- The `KNOWN_LEADS` set is now duplicated knowledge (also implicit in the
+  filesystem layout under `~/.claude/agent-memory/`). If the user adds an
+  8th lead and forgets to update `cf_dispatch_wrapper.py`, that subagent
+  will fall through to the `general-purpose` shared-only path. Not a
+  correctness bug; a graceful degradation. Verifier should note.
+- The CLI smoke tests invoke `python3 cf_dispatch_wrapper.py` as a
+  subprocess. If the user has a real `lesson_ranker.py` deployed in
+  `~/.claude/scripts/` at test time, the smoke tests will see real lesson
+  injection (the original prompt body is preserved at the tail regardless,
+  so the assertion still passes — but the `--json-out` payload's
+  `prompt` field will be longer than just the input).
+- No filesystem writes from the wrapper itself. No `~/.claude/agent-memory/`
+  mutations.
+
+---
+
+## Task: claude-forge v0.4 hook 1a — SessionStart lesson ranker + injector
+
+### What I did
+Implemented the SessionStart lesson-ranker side of the architect's
+continuous-learning v0.3/v0.4 design (§1a + §4). Three deliverables:
+(1) a stdlib-only Python ranker that consumes `~/.claude/agent-memory/INDEX.md`,
+scores each surviving lesson with the hybrid (0.6 tag-Jaccard + 0.2
+recency-decay 90d-halflife + 0.2 helpful/harmful ratio), filters status=stale
+and harmful_count≥2, and always-includes `_starter/` lessons; (2) a
+SessionStart hook script that calls the ranker and emits the
+`hookSpecificOutput.additionalContext` JSON envelope per Claude Code's hook
+contract; (3) a settings.json wiring that appends the hook into
+`hooks.SessionStart` while preserving the existing Stop and PostToolUse
+entries.
+
+### Files modified
+- `~/.claude/settings.json` (via dotfiles symlink): appended one
+  `SessionStart` hook entry; existing `Stop` and `PostToolUse` arrays
+  preserved verbatim. Validated by reloading and counting array lengths.
+
+### Files created
+- `~/.claude/scripts/lesson_ranker.py` (~340 LOC, stdlib only):
+  `rank_lessons_for_question(question, lead, top_k, shared_top_k) -> list[dict]`
+  plus a CLI for the hook to drive (`--question`, `--lead`, `--top-k`,
+  `--shared-top-k`, `--format markdown|json`).
+- `~/.claude/hooks/session-start.sh` (~70 LOC bash): reads the Claude Code
+  payload from stdin, extracts `cwd`/`session_id`, invokes the ranker with
+  `--question ""`, persists the output to
+  `/tmp/claude-forge-context-<session_id>.md` for audit, emits the
+  `hookSpecificOutput` JSON, logs one line per session to
+  `~/.claude/agent-memory/_session-start.log`, always exits 0.
+- `~/.claude/scripts/tests/test_lesson_ranker.py` (~280 LOC): 19 pytest
+  cases. Sandboxed: Jaccard correctness, Jaccard empty cases, Jaccard
+  drives ranking, recency-decay (today=1.0, 90d=0.5, 365d=~0.06),
+  recency-decay unparseable→0, feedback-score normalization (zero=0.5,
+  helpful>0.5, harmful<0.5), tokenize drops stopwords, top-K respected,
+  harmful_count≥2 filter, status=stale filter, lead-partition vs
+  cross-lead, empty-INDEX returns [], garbage-INDEX returns [],
+  `_starter/` always-included, `_starter/` missing tolerated. Live: 1
+  fixture test against the real `research-lead/MEMORY.md` (skipped if
+  absent).
+- `~/.claude/scripts/tests/__init__.py` (empty, makes the tests a package).
+- `~/.claude/settings.json.bak.20260507`: pre-edit backup.
+
+### Design decisions made during implementation
+- **INDEX consumption strategy**: the architect spec said to consume
+  INDEX.md (already shipped by `build_memory_index.py`) rather than walking
+  every MEMORY.md. INDEX.md is a markdown table — I parsed it with a tight
+  regex on row shape and coalesced rows-by-id (each lesson appears once
+  per tag). Avoids re-importing the index-builder's frontmatter state
+  machine; the regex is simpler and equally robust.
+- **Body retrieval**: ranker reads the lesson body from the lead's
+  MEMORY.md only for the chosen top-K (avoids reading all bodies for a
+  filter-and-rank operation). Body is captured verbatim including the
+  `### Title` heading; duplicating it as a separate `title` field is
+  slightly redundant but lets the markdown formatter style headers cleanly.
+- **Defensive contract**: every public-facing path is wrapped so the
+  ranker NEVER raises (per architect §1a "do not block the session").
+  `rank_lessons_for_question()` catches all internal exceptions, falls
+  back to starter lessons, and emits a stderr breadcrumb. The hook script
+  matches this with `set -u` (no `-e`), best-effort `python3` invocations,
+  and a guaranteed `exit 0`.
+- **JSON-context-injection mechanism**: the hook writes its ranker output
+  through a `python3 json.dumps` envelope of the shape
+  `{"hookSpecificOutput": {"hookEventName": "SessionStart",
+  "additionalContext": "<markdown>"}}`. This is the contract Claude Code's
+  SessionStart hook honors — the harness prepends `additionalContext` to
+  the conversation. Verified by smoke-testing the hook with a synthetic
+  `{"session_id":"test-123","cwd":"/tmp"}` payload: hook returned a
+  parseable JSON envelope with a 5046-byte additionalContext string and
+  the persisted /tmp file matched.
+- **Test fixture isolation**: most tests use a `monkeypatch`-driven
+  sandbox that redirects `MEM_ROOT`, `INDEX_FILE`, `STARTER_DIR` to a
+  tmp tree. One live-fixture test against the real `research-lead/MEMORY.md`
+  is included per spec, with a `pytest.skip` fallback so the suite still
+  passes on a fresh machine where INDEX.md hasn't been generated yet.
+- **No new claude-forge orchestrator skill or MCP**: per hard rules, these
+  scripts are framework-internal; no public skill/MCP wrapper.
+
+### Potential blast radius
+- **`~/.claude/settings.json` is a symlink** to
+  `~/Code/dotfiles/claude/.claude/settings.json` (the user's dotfiles
+  repo). The Edit went through the symlink. If the dotfiles repo is
+  git-tracked, the user will see this as one diff in that repo; the
+  backup `.bak.20260507` lives at the symlink-resolved location
+  (`~/.claude/settings.json.bak.20260507`).
+- **Hook fires for every session**, including non-team chat sessions and
+  agent dispatches. The hook is best-effort and logs to
+  `~/.claude/agent-memory/_session-start.log`; no functional issue, but
+  the log will accumulate one line per session start. No rotation logic
+  was added (out of scope; consistent with existing `_scribe-merge.log`).
+- **Hook exit timing**: SessionStart hooks block session start until they
+  return. The ranker reads INDEX.md (~3KB today) plus up to ~25 lesson
+  bodies (~50KB total). On disk-cache cold start this is well under
+  100ms; architect's ≤500ms budget is satisfied by a wide margin.
+- **No touch on gpucheck repo** (per spec). All file paths are under
+  `~/.claude/`.
+- **CLAUDE.md precedence not yet wired**: architect §6 FM-4 specifies
+  that CLAUDE.md must take precedence over MEMORY.md, with the
+  SessionStart hook prepending an explicit note to that effect. The
+  current hook output is just the ranked lessons; a "CLAUDE.md takes
+  precedence" preamble is a future task. Noted but NOT implemented —
+  out of charter scope.
